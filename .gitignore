@@ -1,0 +1,44 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+build/
+dist/
+wheels/
+pip-wheel-metadata/
+
+# Python environments and local configuration
+.venv/
+.env
+
+# Python tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pytype/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Local application data
+instance/
+*.sqlite
+*.sqlite3
+*.db
+
+# Node and Vite build output
+node_modules/
+public/assets/
+public/manifest.json
+
+# Logs and temporary files
+*.log
+logs/
+tmp/
+temp/
