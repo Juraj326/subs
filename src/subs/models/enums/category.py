@@ -12,6 +12,5 @@ class Category(str, PyEnum):
 category_enum = PgEnum(
     Category,
     name="category",
-    create_type=False,
     values_callable=lambda enum_class: [val.value for val in enum_class],
 )

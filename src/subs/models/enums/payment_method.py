@@ -11,6 +11,5 @@ class PaymentMethod(str, PyEnum):
 payment_method_enum = PgEnum(
     PaymentMethod,
     name="payment_method",
-    create_type=False,
     values_callable=lambda enum_class: [val.value for val in enum_class],
 )

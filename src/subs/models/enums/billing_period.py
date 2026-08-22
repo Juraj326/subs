@@ -13,6 +13,5 @@ class BillingPeriod(str, PyEnum):
 billing_period_enum = PgEnum(
     BillingPeriod,
     name="billing_period",
-    create_type=False,
     values_callable=lambda enum_class: [val.value for val in enum_class],
 )
