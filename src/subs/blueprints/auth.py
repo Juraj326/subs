@@ -1,0 +1,37 @@
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    session,
+    url_for,
+)
+from werkzeug.security import check_password_hash
+
+from subs.forms.auth import LoginForm
+
+auth_bp = Blueprint("auth", __name__)
+
+
+@auth_bp.route("/login", methods=["GET", "POST"])
+def login():
+    form = LoginForm()
+
+    if form.validate_on_submit():
+        if check_password_hash(
+            current_app.config["APP_PASSPHRASE_HASH"], form.passphrase.data
+        ):
+            session.clear()
+            session["authenticated"] = True
+            return redirect(url_for("subscriptions.index"))
+
+        flash("Incorrect passphrase", "error")
+
+    return render_template("auth/login.html", form=form)
+
+
+@auth_bp.post("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("auth.login"))
