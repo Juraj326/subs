@@ -11,10 +11,10 @@ from werkzeug.security import check_password_hash
 
 from subs.forms.auth import LoginForm
 
-auth_bp = Blueprint("auth", __name__)
+bp = Blueprint("auth", __name__)
 
 
-@auth_bp.route("/login", methods=["GET", "POST"])
+@bp.route("/login", methods=["GET", "POST"])
 def login():
     form = LoginForm()
 
@@ -31,7 +31,7 @@ def login():
     return render_template("auth/login.html", form=form)
 
 
-@auth_bp.post("/logout")
+@bp.post("/logout")
 def logout():
     session.clear()
     return redirect(url_for("auth.login"))
