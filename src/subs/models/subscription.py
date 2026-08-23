@@ -69,6 +69,10 @@ class Subscription(db.Model):
         default=1,
     )
 
+    billing_date_offset: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=0
+    )
+
     payment_method: Mapped[PaymentMethod] = mapped_column(
         payment_method_enum,
         nullable=False,
