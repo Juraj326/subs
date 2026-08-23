@@ -3,6 +3,7 @@ import re
 
 from dotenv import load_dotenv
 from flask import Flask, redirect, request, session, url_for
+from werkzeug import Response
 
 from subs.blueprints.auth import bp as auth_bp
 from subs.blueprints.calendar import bp as ical_bp
@@ -37,7 +38,7 @@ def create_app() -> Flask:
     app.register_blueprint(ical_bp)
 
     @app.before_request
-    def auth_required():
+    def auth_required() -> Response | None:
         public_endpoints = {"auth.login", "auth.logout", "calendar.ical", "static"}
         if not request.endpoint:
             return
