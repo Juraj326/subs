@@ -7,6 +7,7 @@ from flask import (
     session,
     url_for,
 )
+from werkzeug import Response
 from werkzeug.security import check_password_hash
 
 from subs.forms.auth import LoginForm
@@ -15,7 +16,10 @@ bp = Blueprint("auth", __name__)
 
 
 @bp.route("/login", methods=["GET", "POST"])
-def login():
+def login() -> Response | str:
+    if session.get("authenticated"):
+        return redirect(url_for("subscriptions.index"))
+
     form = LoginForm()
 
     if form.validate_on_submit():
@@ -32,6 +36,6 @@ def login():
 
 
 @bp.post("/logout")
-def logout():
+def logout() -> Response:
     session.clear()
     return redirect(url_for("auth.login"))
