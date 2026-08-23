@@ -2,12 +2,17 @@ import os
 import re
 
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, redirect, request, session, url_for
 
-from .extensions import db
+from subs.blueprints.auth import bp as auth_bp
+from subs.blueprints.calendar import bp as ical_bp
+from subs.blueprints.subscriptions import bp as subs_bp
+
+from .extensions import db, migrate
+from .models import subscription
 
 
-def create_app():
+def create_app() -> Flask:
     load_dotenv()
     app = Flask(import_name=__name__)
 
@@ -25,5 +30,20 @@ def create_app():
     )
 
     db.init_app(app)
+    migrate.init_app(app, db)
+
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(subs_bp)
+    app.register_blueprint(ical_bp)
+
+    @app.before_request
+    def auth_required():
+        public_endpoints = {"auth.login", "auth.logout", "calendar.ical", "static"}
+        if not request.endpoint:
+            return
+        if request.endpoint in public_endpoints or session.get("authenticated"):
+            return
+
+        return redirect(url_for("auth.login"))
 
     return app
