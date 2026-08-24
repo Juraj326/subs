@@ -10,12 +10,15 @@ from flask import (
 from werkzeug import Response
 from werkzeug.security import check_password_hash
 
+from subs.extensions import limiter
 from subs.forms.auth import LoginForm
 
 bp = Blueprint("auth", __name__)
 
 
 @bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"])
+@limiter.limit("20 per hour", methods=["POST"])
 def login() -> Response | str:
     if session.get("authenticated"):
         return redirect(url_for("subscriptions.index"))
@@ -24,7 +27,7 @@ def login() -> Response | str:
 
     if form.validate_on_submit():
         if check_password_hash(
-            current_app.config["APP_PASSPHRASE_HASH"], form.passphrase.data
+            current_app.config["PASSPHRASE_HASH"], form.passphrase.data
         ):
             session.clear()
             session["authenticated"] = True

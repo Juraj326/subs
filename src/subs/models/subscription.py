@@ -11,6 +11,8 @@ from sqlalchemy import (
     Numeric,
     SmallInteger,
     Text,
+    text,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,6 +27,10 @@ class Subscription(db.Model):
     __table_args__ = (
         CheckConstraint("billing_interval > 0", name="billing_interval_is_positive"),
         CheckConstraint("cost >= 0", name="cost_is_positive"),
+        CheckConstraint(
+            "active OR end_date IS NOT NULL",
+            "end_date_required_when_cancelled",
+        ),
     )
 
     id: Mapped[int] = mapped_column(
@@ -42,41 +48,48 @@ class Subscription(db.Model):
     category: Mapped[Category] = mapped_column(
         category_enum,
         nullable=False,
-        default=Category.ENTERTAINMENT,
+        server_default=Category.ENTERTAINMENT.value,
     )
 
     active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        default=True,
+        server_default=true(),
     )
 
     start_date: Mapped[date] = mapped_column(
         Date,
         nullable=False,
-        default=date.today,
+        server_default=text("CURRENT_DATE"),
+    )
+
+    end_date: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
     )
 
     billing_period: Mapped[BillingPeriod] = mapped_column(
         billing_period_enum,
         nullable=False,
-        default=BillingPeriod.MONTH,
+        server_default=BillingPeriod.MONTH.value,
     )
 
     billing_interval: Mapped[int] = mapped_column(
         SmallInteger,
         nullable=False,
-        default=1,
+        server_default=text("1"),
     )
 
     billing_date_offset: Mapped[int] = mapped_column(
-        SmallInteger, nullable=False, default=0
+        SmallInteger,
+        nullable=False,
+        server_default=text("0"),
     )
 
     payment_method: Mapped[PaymentMethod] = mapped_column(
         payment_method_enum,
         nullable=False,
-        default=PaymentMethod.MBANK_MASTERCARD,
+        server_default=PaymentMethod.MBANK_MASTERCARD.value,
     )
 
     cost: Mapped[Decimal] = mapped_column(

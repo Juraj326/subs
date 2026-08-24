@@ -4,9 +4,9 @@ from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 
 
 class Category(str, PyEnum):
-    ESSENTIAL = "essential"
-    ENTERTAINMENT = "entertainment"
-    SCHOOL = "school"
+    ESSENTIAL = "Essential"
+    ENTERTAINMENT = "Entertainment"
+    SCHOOL = "School"
 
 
 category_enum = PgEnum(
