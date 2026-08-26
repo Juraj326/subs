@@ -22,14 +22,22 @@ from .enums.category import Category, category_enum
 from .enums.payment_method import PaymentMethod, payment_method_enum
 
 
-class Subscription(db.Model):
+class Subscription(db.Model):  # ty: ignore[unsupported-base]
     __tablename__ = "subscriptions"
     __table_args__ = (
         CheckConstraint("billing_interval > 0", name="billing_interval_is_positive"),
         CheckConstraint("cost >= 0", name="cost_is_positive"),
         CheckConstraint(
+            "billing_date_offset >= 0",
+            name="billing_date_offset_is_nonnegative",
+        ),
+        CheckConstraint(
             "active OR end_date IS NOT NULL",
-            "end_date_required_when_cancelled",
+            name="end_date_required_when_cancelled",
+        ),
+        CheckConstraint(
+            "active OR end_date >= start_date",
+            name="cancelled_end_date_is_not_before_start_date",
         ),
     )
 
@@ -60,7 +68,6 @@ class Subscription(db.Model):
     start_date: Mapped[date] = mapped_column(
         Date,
         nullable=False,
-        server_default=text("CURRENT_DATE"),
     )
 
     end_date: Mapped[date | None] = mapped_column(
