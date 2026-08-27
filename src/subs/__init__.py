@@ -1,5 +1,9 @@
+import hashlib
 import os
 import re
+from collections.abc import Mapping
+from typing import Any
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dotenv import load_dotenv
@@ -11,13 +15,12 @@ from subs.blueprints.calendar import bp as ical_bp
 from subs.blueprints.subscriptions import bp as subs_bp
 
 from .extensions import csrf, db, limiter, migrate
-from .models import subscription
+from .models import Subscription as Subscription
 
 
-def create_app() -> Flask:
+def create_app(test_config: Mapping[str, Any] | None = None) -> Flask:
     app = Flask(import_name=__name__)
-
-    app.config.from_mapping(_load_config())
+    app.config.from_mapping(_load_config(test_config))
 
     db.init_app(app)
     migrate.init_app(app, db, compare_server_default=True)
@@ -41,54 +44,114 @@ def create_app() -> Flask:
     return app
 
 
-def _load_config() -> dict[str, str | ZoneInfo]:
+def _load_config(overrides: Mapping[str, Any] | None = None) -> dict[str, Any]:
     load_dotenv()
 
-    config_mapping = {}
+    config: dict[str, Any] = {
+        "APP_ENV": os.environ.get("APP_ENV"),
+        "DATABASE_URL": os.environ.get("DATABASE_URL"),
+        "RATELIMIT_STORAGE_URI": os.environ.get("RATELIMIT_STORAGE_URI"),
+        "SECRET_KEY": os.environ.get("SECRET_KEY"),
+        "PASSPHRASE_HASH": os.environ.get("PASSPHRASE_HASH"),
+        "CALENDAR_FEED_TOKEN": os.environ.get("CALENDAR_FEED_TOKEN"),
+        "TIMEZONE": os.environ.get("TIMEZONE"),
+        "SESSION_COOKIE_HTTPONLY": True,
+        "SESSION_COOKIE_SAMESITE": "Lax",
+        "SQLALCHEMY_TRACK_MODIFICATIONS": False,
+    }
 
-    db_url = os.environ.get("DATABASE_URL")
-    if not db_url:
+    if overrides:
+        config.update(overrides)
+
+    _validate_and_normalize_config(config)
+    return config
+
+
+def _validate_and_normalize_config(config: dict[str, Any]) -> None:
+    environment = config.get("APP_ENV")
+    if environment not in {"development", "test", "production"}:
+        raise RuntimeError("APP_ENV must be development, test, or production")
+
+    database_url = config.get("DATABASE_URL")
+    if not isinstance(database_url, str) or not database_url:
         raise RuntimeError("Database URL must be configured")
-    if not db_url.startswith(("postgresql://", "postgresql+psycopg://")):
+    if not database_url.startswith(("postgresql://", "postgresql+psycopg://")):
         raise RuntimeError("DATABASE_URL must use PostgreSQL")
-    config_mapping["SQLALCHEMY_DATABASE_URI"] = re.sub(
-        r"^postgresql:", "postgresql+psycopg:", db_url
+    config["SQLALCHEMY_DATABASE_URI"] = re.sub(
+        r"^postgresql:", "postgresql+psycopg:", database_url
     )
 
-    secret_key = os.environ.get("SECRET_KEY")
-    if not secret_key:
+    storage_uri = config.get("RATELIMIT_STORAGE_URI")
+    if environment == "production":
+        if not isinstance(storage_uri, str) or not _is_shared_redis_uri(storage_uri):
+            raise RuntimeError(
+                "RATELIMIT_STORAGE_URI must use shared Redis in production"
+            )
+    elif not storage_uri:
+        config["RATELIMIT_STORAGE_URI"] = "memory://"
+
+    secret_key = config.get("SECRET_KEY")
+    if not isinstance(secret_key, str) or not secret_key:
         raise RuntimeError("SECRET_KEY must be configured")
     if len(secret_key) < 32:
         raise RuntimeError("SECRET_KEY must be at least 32 characters")
-    config_mapping["SECRET_KEY"] = secret_key
 
-    passphrase_hash = os.environ.get("PASSPHRASE_HASH")
-    if not passphrase_hash:
+    passphrase_hash = config.get("PASSPHRASE_HASH")
+    if not isinstance(passphrase_hash, str) or not passphrase_hash:
         raise RuntimeError("PASSPHRASE_HASH must be configured")
-    if not passphrase_hash.startswith(("scrypt:", "pbkdf2:")):
-        raise RuntimeError("PASSPHRASE_HASH is not a recognized password hash")
-    config_mapping["PASSPHRASE_HASH"] = passphrase_hash
+    if not _is_valid_password_hash(passphrase_hash):
+        raise RuntimeError("PASSPHRASE_HASH is not a complete Werkzeug password hash")
 
-    calendar_feed_token = os.environ.get("CALENDAR_FEED_TOKEN")
-    if not calendar_feed_token:
+    calendar_feed_token = config.get("CALENDAR_FEED_TOKEN")
+    if not isinstance(calendar_feed_token, str) or not calendar_feed_token:
         raise RuntimeError("CALENDAR_FEED_TOKEN must be configured")
     if len(calendar_feed_token) < 32:
         raise RuntimeError("CALENDAR_FEED_TOKEN must be at least 32 characters")
-    config_mapping["CALENDAR_FEED_TOKEN"] = calendar_feed_token
 
-    timezone = os.environ.get("TIMEZONE")
-    if not timezone:
-        raise RuntimeError("TIMEZONE must be configured")
+    timezone = config.get("TIMEZONE")
+    if isinstance(timezone, str):
+        try:
+            config["TIMEZONE"] = ZoneInfo(timezone)
+        except ZoneInfoNotFoundError:
+            raise RuntimeError("TIMEZONE must be a valid IANA timezone")
+    elif not isinstance(timezone, ZoneInfo):
+        raise TypeError("TIMEZONE must be configured as a valid IANA timezone")
+
+    config["SESSION_COOKIE_SECURE"] = environment == "production"
+
+
+def _is_shared_redis_uri(storage_uri: str) -> bool:
+    parsed_uri = urlsplit(storage_uri)
+    return parsed_uri.scheme in {"redis", "rediss"} and parsed_uri.hostname is not None
+
+
+def _is_valid_password_hash(password_hash: str) -> bool:
     try:
-        config_mapping["TIMEZONE"] = ZoneInfo(timezone)
-    except ZoneInfoNotFoundError:
-        raise RuntimeError("TIMEZONE must be a valid IANA timezone")
+        method, salt, digest = password_hash.split("$")
+    except ValueError:
+        return False
 
-    # config_mapping["SESSION_COOKIE_SECURE"] = True
-    config_mapping["SESSION_COOKIE_SAMESITE"] = "Lax"
+    if not re.fullmatch(r"[A-Za-z0-9]+", salt):
+        return False
+    if not re.fullmatch(r"[0-9a-f]+", digest):
+        return False
 
-    ratelimit_storage_uri = os.environ.get("RATELIMIT_STORAGE_URI")
-    if ratelimit_storage_uri:
-        config_mapping["RATELIMIT_STORAGE_URI"] = ratelimit_storage_uri
+    method_parts = method.split(":")
+    if method_parts[0] == "scrypt" and len(method_parts) == 4:
+        try:
+            n, r, p = (int(value) for value in method_parts[1:])
+        except ValueError:
+            return False
+        return n > 1 and n & (n - 1) == 0 and r > 0 and p > 0 and len(digest) == 128
 
-    return config_mapping
+    if method_parts[0] == "pbkdf2" and len(method_parts) == 3:
+        try:
+            iterations = int(method_parts[2])
+            digest_size = len(
+                hashlib.pbkdf2_hmac(method_parts[1], b"password", b"salt", 1)
+            )
+        except TypeError, ValueError:
+            return False
+        return iterations > 0 and digest_size > 0 and len(digest) == digest_size * 2
+
+    return False
