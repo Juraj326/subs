@@ -23,9 +23,7 @@ def test_factory_accepts_test_config_and_converts_postgres_uri(
     app = create_app(config)
 
     assert app.config["DATABASE_URL"] == "postgresql://test:test@localhost/test"
-    assert str(app.config["SQLALCHEMY_DATABASE_URI"]).startswith(
-        "postgresql+psycopg://"
-    )
+    assert str(app.config["SQLALCHEMY_DATABASE_URI"]).startswith("postgresql+psycopg://")
     assert app.config["APP_ENV"] == "test"
     assert app.config["RATELIMIT_STORAGE_URI"] == "memory://"
 
@@ -40,9 +38,7 @@ def test_factory_accepts_test_config_and_converts_postgres_uri(
         "unknown:1$salt$" + "a" * 64,
     ],
 )
-def test_factory_rejects_malformed_complete_hash(
-    app_config: dict[str, object], password_hash: str
-) -> None:
+def test_factory_rejects_malformed_complete_hash(app_config: dict[str, object], password_hash: str) -> None:
     with pytest.raises(RuntimeError, match="complete Werkzeug password hash"):
         create_app(_config(app_config, PASSPHRASE_HASH=password_hash))
 

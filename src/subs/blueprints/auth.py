@@ -26,9 +26,7 @@ def login() -> Response | str:
     form = LoginForm()
 
     if form.validate_on_submit():
-        if check_password_hash(
-            current_app.config["PASSPHRASE_HASH"], form.passphrase.data
-        ):
+        if check_password_hash(current_app.config["PASSPHRASE_HASH"], form.passphrase.data):
             session.clear()
             session["authenticated"] = True
             return redirect(url_for("subscriptions.index"))

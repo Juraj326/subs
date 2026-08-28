@@ -43,9 +43,7 @@ def test_invalid_calendar_token_is_public_but_hidden(app: Flask) -> None:
     assert response.status_code == 404
 
 
-def test_valid_calendar_token_returns_icalendar(
-    app: Flask, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_valid_calendar_token_returns_icalendar(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         calendar_blueprint,
         "get_calendar_ics",
@@ -57,9 +55,7 @@ def test_valid_calendar_token_returns_icalendar(
 
     assert response.status_code == 200
     assert response.content_type == "text/calendar; charset=utf-8"
-    assert response.headers["Content-Disposition"] == (
-        "inline; filename=subscription.ics"
-    )
+    assert response.headers["Content-Disposition"] == ("inline; filename=subscription.ics")
     assert response.data.startswith(b"BEGIN:VCALENDAR")
 
 

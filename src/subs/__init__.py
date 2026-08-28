@@ -77,16 +77,12 @@ def _validate_and_normalize_config(config: dict[str, Any]) -> None:
         raise RuntimeError("Database URL must be configured")
     if not database_url.startswith(("postgresql://", "postgresql+psycopg://")):
         raise RuntimeError("DATABASE_URL must use PostgreSQL")
-    config["SQLALCHEMY_DATABASE_URI"] = re.sub(
-        r"^postgresql:", "postgresql+psycopg:", database_url
-    )
+    config["SQLALCHEMY_DATABASE_URI"] = re.sub(r"^postgresql:", "postgresql+psycopg:", database_url)
 
     storage_uri = config.get("RATELIMIT_STORAGE_URI")
     if environment == "production":
         if not isinstance(storage_uri, str) or not _is_shared_redis_uri(storage_uri):
-            raise RuntimeError(
-                "RATELIMIT_STORAGE_URI must use shared Redis in production"
-            )
+            raise RuntimeError("RATELIMIT_STORAGE_URI must use shared Redis in production")
     elif not storage_uri:
         config["RATELIMIT_STORAGE_URI"] = "memory://"
 
@@ -147,9 +143,7 @@ def _is_valid_password_hash(password_hash: str) -> bool:
     if method_parts[0] == "pbkdf2" and len(method_parts) == 3:
         try:
             iterations = int(method_parts[2])
-            digest_size = len(
-                hashlib.pbkdf2_hmac(method_parts[1], b"password", b"salt", 1)
-            )
+            digest_size = len(hashlib.pbkdf2_hmac(method_parts[1], b"password", b"salt", 1))
         except TypeError, ValueError:
             return False
         return iterations > 0 and digest_size > 0 and len(digest) == digest_size * 2

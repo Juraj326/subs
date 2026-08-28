@@ -29,9 +29,7 @@ def upgrade() -> None:
             server_default="Entertainment",
             nullable=False,
         ),
-        sa.Column(
-            "active", sa.Boolean(), server_default=sa.text("true"), nullable=False
-        ),
+        sa.Column("active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column(
             "start_date",
             sa.Date(),
@@ -65,9 +63,7 @@ def upgrade() -> None:
         ),
         sa.Column("cost", sa.Numeric(precision=10, scale=2), nullable=False),
         sa.Column("url", sa.Text(), nullable=True),
-        sa.CheckConstraint(
-            "active OR end_date IS NOT NULL", name="end_date_required_when_cancelled"
-        ),
+        sa.CheckConstraint("active OR end_date IS NOT NULL", name="end_date_required_when_cancelled"),
         sa.CheckConstraint("billing_interval > 0", name="billing_interval_is_positive"),
         sa.CheckConstraint("cost >= 0", name="cost_is_positive"),
         sa.PrimaryKeyConstraint("id"),
