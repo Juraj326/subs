@@ -63,6 +63,16 @@ def test_zero_cost_and_offset_are_valid(app: Flask) -> None:
     assert form.billing_date_offset.data == 0
 
 
+def test_negative_billing_date_offset_is_valid(app: Flask) -> None:
+    data = _valid_form_data()
+    data["billing_date_offset"] = "-5"
+
+    form = _form(data)
+
+    assert form.validate()
+    assert form.billing_date_offset.data == -5
+
+
 def test_blank_optional_url_becomes_none(app: Flask) -> None:
     data = _valid_form_data()
     data["url"] = "   "
@@ -131,7 +141,6 @@ def test_update_form_uses_existing_subscription_status(app: Flask) -> None:
         ("billing_period", "decade"),
         ("billing_interval", "0"),
         ("billing_interval", "not-a-number"),
-        ("billing_date_offset", "-1"),
         ("billing_date_offset", "not-a-number"),
         ("payment_method", "Cash"),
         ("cost", "-0.01"),

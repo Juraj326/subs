@@ -110,13 +110,7 @@ class SubscriptionForm(FlaskForm):
     billing_date_offset = IntegerField(
         "Billing date offset",
         default=0,
-        validators=[
-            InputRequired(message="Billing date offset is required."),
-            NumberRange(
-                min=0,
-                message="Billing date offset must be zero or greater.",
-            ),
-        ],
+        validators=[InputRequired(message="Billing date offset is required.")],
     )
     payment_method = SelectField(
         "Payment method",

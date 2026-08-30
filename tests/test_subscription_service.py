@@ -106,12 +106,14 @@ def test_create_subscription_stages_and_commits(
     )
     monkeypatch.setattr(subscription_service, "_commit", commit)
     fields = _valid_fields()
+    fields["billing_date_offset"] = -2
 
     created = _create(fields)
 
     assert added == [created]
     assert created.service == "Netflix"
     assert created.start_date == date(2026, 1, 31)
+    assert created.billing_date_offset == -2
     assert created.cost == Decimal("12.90")
     assert created.url == "https://www.netflix.com/account"
     assert created.active is True
@@ -209,7 +211,16 @@ def test_active_subscription_ignores_an_existing_end_date_on_update(
     assert updated.end_date == date(2025, 1, 1)
 
 
+@pytest.mark.parametrize(
+    ("billing_date_offset", "expected_end_date"),
+    [
+        (5, date(2026, 5, 15)),
+        (-5, date(2026, 5, 10)),
+    ],
+)
 def test_update_to_cancelled_stores_expiration_from_submitted_fields(
+    billing_date_offset: int,
+    expected_end_date: date,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     subscription = _subscription()
@@ -230,7 +241,7 @@ def test_update_to_cancelled_stores_expiration_from_submitted_fields(
     fields.update(
         start_date=date(2026, 2, 10),
         billing_interval=3,
-        billing_date_offset=5,
+        billing_date_offset=billing_date_offset,
     )
 
     updated = _update(
@@ -242,7 +253,7 @@ def test_update_to_cancelled_stores_expiration_from_submitted_fields(
 
     assert updated is subscription
     assert subscription.active is False
-    assert subscription.end_date == date(2026, 5, 15)
+    assert subscription.end_date == expected_end_date
     commit.assert_called_once_with()
 
 

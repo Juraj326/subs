@@ -150,14 +150,28 @@ def test_range_and_as_of_boundaries_are_inclusive() -> None:
     assert renewals == [date(2026, 2, 1), date(2026, 3, 1), date(2026, 4, 1)]
 
 
-def test_offset_is_added_to_the_charge_date() -> None:
-    assert get_billing_and_expiration_date(
-        date(2026, 1, 31),
-        BillingPeriod.MONTH,
-        1,
-        5,
-        date(2026, 2, 28),
-    ) == (date(2026, 2, 28), date(2026, 3, 5))
+@pytest.mark.parametrize(
+    ("offset", "expected"),
+    [
+        (-5, (date(2026, 2, 23), date(2026, 2, 28))),
+        (0, (date(2026, 2, 28), date(2026, 2, 28))),
+        (5, (date(2026, 2, 28), date(2026, 3, 5))),
+    ],
+)
+def test_signed_offset_positions_billing_and_expiration_dates(
+    offset: int,
+    expected: tuple[date, date],
+) -> None:
+    assert (
+        get_billing_and_expiration_date(
+            date(2026, 1, 31),
+            BillingPeriod.MONTH,
+            1,
+            offset,
+            date(2026, 2, 28),
+        )
+        == expected
+    )
 
 
 def test_local_today_respects_timezone_boundary() -> None:

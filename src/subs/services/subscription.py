@@ -173,7 +173,9 @@ def get_billing_and_expiration_date(
         as_of,
     )
 
-    return billing_date - timedelta(days=offset), billing_date
+    if offset < 0:
+        return billing_date + timedelta(offset), billing_date
+    return billing_date, billing_date + timedelta(offset)
 
 
 def local_today(timezone: tzinfo, now: datetime | None = None) -> date:

@@ -28,10 +28,6 @@ class Subscription(db.Model):  # ty: ignore[unsupported-base]
         CheckConstraint("billing_interval > 0", name="billing_interval_is_positive"),
         CheckConstraint("cost >= 0", name="cost_is_positive"),
         CheckConstraint(
-            "billing_date_offset >= 0",
-            name="billing_date_offset_is_nonnegative",
-        ),
-        CheckConstraint(
             "active OR end_date IS NOT NULL",
             name="end_date_required_when_cancelled",
         ),
