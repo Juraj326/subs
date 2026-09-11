@@ -13,8 +13,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "chart.js": "^4.5.1",
-    "fullcalendar": "^7.0.2"
+    "chart.js": "^4.5.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
