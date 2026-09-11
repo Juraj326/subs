@@ -32,7 +32,7 @@ class Subscription(db.Model):  # ty: ignore[unsupported-base]
             name="end_date_required_when_cancelled",
         ),
         CheckConstraint(
-            "active OR end_date >= start_date",
+            "active OR end_date >= start_date + billing_date_offset",
             name="cancelled_end_date_is_not_before_start_date",
         ),
     )
@@ -101,6 +101,11 @@ class Subscription(db.Model):  # ty: ignore[unsupported-base]
     )
 
     url: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    image_url: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )

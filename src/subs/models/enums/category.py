@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 class Category(str, PyEnum):
     ESSENTIAL = "Essential"
     ENTERTAINMENT = "Entertainment"
-    SCHOOL = "School"
+    PROFESSIONAL = "Professional"
 
 
 category_enum = PgEnum(
