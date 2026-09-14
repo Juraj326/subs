@@ -1,25 +1,34 @@
-import hashlib
 import os
 import re
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dotenv import load_dotenv
-from flask import Flask, redirect, request, session, url_for
+from flask import Flask, redirect, render_template, request, session, url_for
+from flask_wtf.csrf import CSRFError
 from werkzeug import Response
 
+from subs.assets import get_frontend_assets
 from subs.blueprints.auth import bp as auth_bp
 from subs.blueprints.calendar import bp as ical_bp
 from subs.blueprints.subscriptions import bp as subs_bp
+from subs.formatting import format_eur
 
 from .extensions import csrf, db, limiter, migrate
 from .models import Subscription as Subscription
 
+_PUBLIC_DIR = Path(__file__).resolve().parents[2] / "public"
+
 
 def create_app(test_config: Mapping[str, Any] | None = None) -> Flask:
-    app = Flask(import_name=__name__)
+    app = Flask(
+        import_name=__name__,
+        static_folder=str(_PUBLIC_DIR),
+        static_url_path="",
+    )
     app.config.from_mapping(_load_config(test_config))
 
     db.init_app(app)
@@ -30,6 +39,16 @@ def create_app(test_config: Mapping[str, Any] | None = None) -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(subs_bp)
     app.register_blueprint(ical_bp)
+
+    @app.context_processor
+    def frontend_context() -> dict[str, object]:
+        return {"frontend_assets": get_frontend_assets(app)}
+
+    app.add_template_filter(format_eur, "eur")
+
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(_error: CSRFError) -> tuple[str, int]:
+        return render_template("errors/csrf.html"), 400
 
     @app.before_request
     def auth_required() -> Response | None:
@@ -95,8 +114,9 @@ def _validate_and_normalize_config(config: dict[str, Any]) -> None:
     passphrase_hash = config.get("PASSPHRASE_HASH")
     if not isinstance(passphrase_hash, str) or not passphrase_hash:
         raise RuntimeError("PASSPHRASE_HASH must be configured")
-    if not _is_valid_password_hash(passphrase_hash):
-        raise RuntimeError("PASSPHRASE_HASH is not a complete Werkzeug password hash")
+    hash_parts = passphrase_hash.split("$")
+    if len(hash_parts) != 3 or not all(hash_parts):
+        raise RuntimeError("PASSPHRASE_HASH must have the format method$salt$digest")
 
     calendar_feed_token = config.get("CALENDAR_FEED_TOKEN")
     if not isinstance(calendar_feed_token, str) or not calendar_feed_token:
@@ -119,33 +139,3 @@ def _validate_and_normalize_config(config: dict[str, Any]) -> None:
 def _is_shared_redis_uri(storage_uri: str) -> bool:
     parsed_uri = urlsplit(storage_uri)
     return parsed_uri.scheme in {"redis", "rediss"} and parsed_uri.hostname is not None
-
-
-def _is_valid_password_hash(password_hash: str) -> bool:
-    try:
-        method, salt, digest = password_hash.split("$")
-    except ValueError:
-        return False
-
-    if not re.fullmatch(r"[A-Za-z0-9]+", salt):
-        return False
-    if not re.fullmatch(r"[0-9a-f]+", digest):
-        return False
-
-    method_parts = method.split(":")
-    if method_parts[0] == "scrypt" and len(method_parts) == 4:
-        try:
-            n, r, p = (int(value) for value in method_parts[1:])
-        except ValueError:
-            return False
-        return n > 1 and n & (n - 1) == 0 and r > 0 and p > 0 and len(digest) == 128
-
-    if method_parts[0] == "pbkdf2" and len(method_parts) == 3:
-        try:
-            iterations = int(method_parts[2])
-            digest_size = len(hashlib.pbkdf2_hmac(method_parts[1], b"password", b"salt", 1))
-        except TypeError, ValueError:
-            return False
-        return iterations > 0 and digest_size > 0 and len(digest) == digest_size * 2
-
-    return False

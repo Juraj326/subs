@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from datetime import date, datetime, timedelta, tzinfo
 from decimal import Decimal
 
@@ -49,6 +50,7 @@ def create_subscription(
     payment_method: PaymentMethod,
     cost: Decimal,
     url: str | None,
+    image_url: str | None,
 ) -> Subscription:
     _ensure_service_is_unique(service)
 
@@ -64,6 +66,7 @@ def create_subscription(
         payment_method=payment_method,
         cost=cost,
         url=url,
+        image_url=image_url,
     )
     subscription_repository.add_subscription(subscription)
 
@@ -84,23 +87,29 @@ def update_subscription(
     payment_method: PaymentMethod,
     cost: Decimal,
     url: str | None,
+    image_url: str | None,
     as_of: date | None = None,
 ) -> Subscription:
     subscription = _get_subscription(subscription_id)
     _ensure_service_is_unique(service, subscription_id)
 
-    if subscription.active and not active:
-        _, subscription.end_date = get_billing_and_expiration_date(
-            start_date,
-            billing_period,
-            billing_interval,
-            billing_date_offset,
-            as_of,
-        )
+    end_date = subscription.end_date
+    if not active:
+        if subscription.active:
+            _, end_date = get_billing_and_expiration_date(
+                start_date, billing_period, billing_interval, billing_date_offset, as_of
+            )
+        else:
+            end_date = correct_cancelled_expiration(
+                subscription, start_date, billing_period, billing_interval, billing_date_offset
+            )
+    elif not subscription.active:
+        end_date = None
 
     subscription.active = active
     subscription.service = service
     subscription.start_date = start_date
+    subscription.end_date = end_date
     subscription.category = category
     subscription.billing_period = billing_period
     subscription.billing_interval = billing_interval
@@ -108,9 +117,44 @@ def update_subscription(
     subscription.payment_method = payment_method
     subscription.cost = cost
     subscription.url = url
+    subscription.image_url = image_url
 
     _commit()
     return subscription
+
+
+def correct_cancelled_expiration(
+    subscription: Subscription,
+    start_date: date,
+    billing_period: BillingPeriod,
+    billing_interval: int,
+    offset: int,
+) -> date:
+    index = _recorded_cancellation_index(subscription)
+    reference = _renewal_at(start_date, subscription.billing_period, subscription.billing_interval, index)
+    corrected_index = _first_renewal_index(start_date, billing_period, billing_interval, reference)
+    return _renewal_at(start_date, billing_period, billing_interval, corrected_index) + timedelta(days=offset)
+
+
+def _recorded_cancellation_index(subscription: Subscription) -> int:
+    if subscription.end_date is None:
+        raise SubscriptionValidationError({"start_date": "Cancelled subscription has no recorded expiration."})
+
+    boundaries = [subscription.end_date - timedelta(days=subscription.billing_date_offset)]
+    if subscription.billing_date_offset < 0:
+        boundaries.append(subscription.end_date)
+
+    for boundary in boundaries:
+        index = _first_renewal_index(
+            subscription.start_date, subscription.billing_period, subscription.billing_interval, boundary
+        )
+        if (
+            _renewal_at(subscription.start_date, subscription.billing_period, subscription.billing_interval, index)
+            == boundary
+        ):
+            return index
+
+    raise SubscriptionValidationError({"start_date": "Recorded expiration does not match the billing schedule."})
 
 
 def delete_subscription(subscription_id: int) -> Subscription:
@@ -121,39 +165,55 @@ def delete_subscription(subscription_id: int) -> Subscription:
     return subscription
 
 
-def get_renewals(
+def _iter_access_events(
     start_date: date,
     billing_period: BillingPeriod,
     billing_interval: int,
+    offset: int,
+    range_start: date,
+    as_of: date | None,
+    range_end: date | None = None,
+) -> Iterator[date]:
+    effective_start = max(range_start, as_of) if as_of is not None else range_start
+    if range_end is not None and effective_start > range_end:
+        return
+
+    shift = timedelta(days=offset)
+    index = _first_renewal_index(start_date, billing_period, billing_interval, effective_start - shift)
+    # Only an explicit evaluation date can mark the initial payment as already paid.
+    if offset == 0 and start_date == as_of:
+        index = max(index, 1)
+
+    while True:
+        event = _renewal_at(start_date, billing_period, billing_interval, index) + shift
+        if range_end is not None and event > range_end:
+            return
+        yield event
+        index += 1
+
+
+def get_next_access_date(
+    start_date: date,
+    billing_period: BillingPeriod,
+    billing_interval: int,
+    offset: int,
+    as_of: date,
+) -> date:
+    return next(_iter_access_events(start_date, billing_period, billing_interval, offset, as_of, as_of))
+
+
+def get_access_renewals(
+    start_date: date,
+    billing_period: BillingPeriod,
+    billing_interval: int,
+    offset: int,
     range_start: date,
     range_end: date,
     as_of: date | None = None,
 ) -> list[date]:
-    effective_start = max(range_start, as_of) if as_of is not None else range_start
-    if effective_start > range_end:
-        return []
-
-    index = _first_renewal_index(start_date, billing_period, billing_interval, effective_start)
-    renewals: list[date] = []
-    while True:
-        renewal = _renewal_at(start_date, billing_period, billing_interval, index)
-        if renewal > range_end:
-            break
-        renewals.append(renewal)
-        index += 1
-
-    return renewals
-
-
-def get_next_billing_date(
-    start_date: date,
-    billing_period: BillingPeriod,
-    billing_interval: int,
-    as_of: date,
-) -> date:
-    index = _first_renewal_index(start_date, billing_period, billing_interval, as_of)
-
-    return _renewal_at(start_date, billing_period, billing_interval, index)
+    return list(
+        _iter_access_events(start_date, billing_period, billing_interval, offset, range_start, as_of, range_end)
+    )
 
 
 def get_billing_and_expiration_date(
@@ -166,16 +226,15 @@ def get_billing_and_expiration_date(
     if as_of is None:
         as_of = local_today(current_app.config["TIMEZONE"])
 
-    billing_date = get_next_billing_date(
+    index = _first_renewal_index(
         start_date,
         billing_period,
         billing_interval,
-        as_of,
+        as_of + timedelta(days=1),
     )
+    billing_date = _renewal_at(start_date, billing_period, billing_interval, index)
 
-    if offset < 0:
-        return billing_date + timedelta(offset), billing_date
-    return billing_date, billing_date + timedelta(offset)
+    return billing_date, billing_date + timedelta(days=offset)
 
 
 def local_today(timezone: tzinfo, now: datetime | None = None) -> date:

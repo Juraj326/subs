@@ -1,6 +1,7 @@
 import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from typing import TypedDict, cast
 
 from flask import current_app
 from flask_wtf import FlaskForm
@@ -31,6 +32,21 @@ from subs.services.subscription import local_today
 
 _CENT = Decimal("0.01")
 _MAX_COST = Decimal("99999999.99")
+_SMALLINT_MIN = -32768
+_SMALLINT_MAX = 32767
+
+
+class SubscriptionInput(TypedDict):
+    service: str
+    start_date: date
+    category: Category
+    billing_period: BillingPeriod
+    billing_interval: int
+    billing_date_offset: int
+    payment_method: PaymentMethod
+    cost: Decimal
+    url: str | None
+    image_url: str | None
 
 
 def _strip(value: str | None) -> str:
@@ -57,10 +73,15 @@ def _default_start_date() -> date:
     return local_today(current_app.config["TIMEZONE"])
 
 
-def _validate_currency_precision(_form: FlaskForm, field: DecimalField) -> None:
+def _validate_cost(_form: FlaskForm, field: DecimalField) -> None:
     amount = field.data
     if amount is None:
         return
+
+    if not amount.is_finite():
+        raise ValidationError("Cost must be a valid decimal amount.")
+    if not Decimal(0) <= amount <= _MAX_COST:
+        raise ValidationError("Cost must be between 0 and 99,999,999.99.")
 
     try:
         normalized_amount = amount.quantize(_CENT)
@@ -82,6 +103,7 @@ class SubscriptionForm(FlaskForm):
     )
     start_date = DateField(
         "Original charge date",
+        format="%d.%m.%Y",
         default=_default_start_date,
         validators=[InputRequired(message="Original charge date is required.")],
     )
@@ -104,13 +126,24 @@ class SubscriptionForm(FlaskForm):
         default=1,
         validators=[
             InputRequired(message="Billing interval is required."),
-            NumberRange(min=1, message="Billing interval must be at least 1."),
+            NumberRange(
+                min=1,
+                max=_SMALLINT_MAX,
+                message="Billing interval must be between 1 and 32,767.",
+            ),
         ],
     )
     billing_date_offset = IntegerField(
-        "Billing date offset",
+        "Access offset in days",
         default=0,
-        validators=[InputRequired(message="Billing date offset is required.")],
+        validators=[
+            InputRequired(message="Access offset is required."),
+            NumberRange(
+                min=_SMALLINT_MIN,
+                max=_SMALLINT_MAX,
+                message="Access offset must be between -32,768 and 32,767.",
+            ),
+        ],
     )
     payment_method = SelectField(
         "Payment method",
@@ -125,12 +158,7 @@ class SubscriptionForm(FlaskForm):
         render_kw={"step": "0.01"},
         validators=[
             InputRequired(message="Cost is required."),
-            NumberRange(
-                min=Decimal(0),
-                max=_MAX_COST,
-                message="Cost must be between 0 and 99,999,999.99.",
-            ),
-            _validate_currency_precision,
+            _validate_cost,
         ],
     )
     url = URLField(
@@ -146,7 +174,35 @@ class SubscriptionForm(FlaskForm):
             ),
         ],
     )
+    image_url = URLField(
+        "Image URL",
+        filters=[_strip_optional],
+        validators=[
+            Optional(),
+            URL(require_tld=False, message="Image URL must be valid."),
+            Regexp(
+                r"^https?://\S+$",
+                flags=re.IGNORECASE,
+                message="Image URL must use HTTP or HTTPS.",
+            ),
+        ],
+    )
     submit = SubmitField("Save subscription")
+
+    def service_values(self) -> SubscriptionInput:
+        """Return service inputs after successful form validation."""
+        return {
+            "service": cast(str, self.service.data),
+            "start_date": cast(date, self.start_date.data),
+            "category": cast(Category, self.category.data),
+            "billing_period": cast(BillingPeriod, self.billing_period.data),
+            "billing_interval": cast(int, self.billing_interval.data),
+            "billing_date_offset": cast(int, self.billing_date_offset.data),
+            "payment_method": cast(PaymentMethod, self.payment_method.data),
+            "cost": cast(Decimal, self.cost.data),
+            "url": self.url.data,
+            "image_url": self.image_url.data,
+        }
 
 
 class UpdateSubscriptionForm(SubscriptionForm):
@@ -154,6 +210,7 @@ class UpdateSubscriptionForm(SubscriptionForm):
         "Status",
         choices=[("true", "Active"), ("false", "Cancelled")],
         coerce=_coerce_active,
+        default=True,
         validators=[InputRequired(message="Status is required.")],
     )
     submit = SubmitField("Save changes")

@@ -7,7 +7,7 @@ from icalendar import Calendar, Event
 
 from subs.models.subscription import Subscription
 from subs.repositories.subscription import get_all_subscriptions
-from subs.services.subscription import get_renewals, local_today
+from subs.services.subscription import get_access_renewals, local_today
 
 
 def get_calendar_ics(as_of: date | None = None) -> bytes:
@@ -39,10 +39,11 @@ def build_calendar(
 
     for subscription in subscriptions:
         if subscription.active:
-            renewals = get_renewals(
+            renewals = get_access_renewals(
                 subscription.start_date,
                 subscription.billing_period,
                 subscription.billing_interval,
+                subscription.billing_date_offset,
                 range_start,
                 range_end,
                 as_of,
@@ -82,6 +83,6 @@ def _event_description(subscription: Subscription) -> str:
     return (
         f"{subscription.category.value}\n"
         f"{billing_description}\n"
-        f"{subscription.cost:.2f} EUR\n"
+        f"{subscription.cost:.2f}€\n"
         f"{subscription.payment_method.value}"
     )
