@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [tailwindcss()],
   publicDir: false,
   build: {
-    outDir: "src/subs/static/assets",
+    outDir: "public/assets",
     emptyOutDir: true,
     rollupOptions: {
       input: "assets/js/main.js",
