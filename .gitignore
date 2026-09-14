@@ -34,7 +34,7 @@ instance/
 
 # Node and Vite build output
 node_modules/
-src/subs/static/assets/
+public/assets/
 
 # Logs and temporary files
 *.log
