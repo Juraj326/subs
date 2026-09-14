@@ -1,0 +1,36 @@
+{% macro errors(field) %}
+  <ul id="{{ field.id }}-errors" class="mt-2 space-y-1 text-xs font-medium text-error-ink {{ 'hidden' if not field.errors }}" role="alert" data-field-errors>
+    {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+  </ul>
+{% endmacro %}
+
+{% macro field_label(id, text, hidden=false) %}
+  <label class="{{ 'sr-only' if hidden else 'mb-2 block text-sm font-semibold text-base-content/70' }}" for="{{ id }}">{{ text }}</label>
+{% endmacro %}
+
+{% macro form_field(field, control="input", extra_class="", help_text=none, label_hidden=false, wrapper_id=none, hidden=false) %}
+  {% set control_class = 'select w-full bg-base-100/55' if control == 'select' else 'input w-full bg-base-100/55' %}
+  {% set error_id = field.id ~ '-errors' %}
+  {% set help_id = field.id ~ '-help' if help_text else none %}
+  {% set describedby = help_id ~ ' ' ~ error_id if help_id else error_id %}
+  <div class="min-w-0 {{ 'hidden' if hidden }}"{% if wrapper_id %} id="{{ wrapper_id }}"{% endif %}>
+    {{ field_label(field.id, field.label.text, label_hidden) }}
+    {{ field(class=control_class ~ ' ' ~ extra_class, aria_invalid="true" if field.errors else "false", aria_describedby=describedby, **kwargs) }}
+    {% if help_text %}
+      <p id="{{ help_id }}" class="mt-2 text-xs leading-[1.45] text-base-content/70">{{ help_text }}</p>
+    {% endif %}
+    {{ errors(field) }}
+  </div>
+{% endmacro %}
+
+{% macro currency_field(field) %}
+  {% set error_id = field.id ~ '-errors' %}
+  <div class="min-w-0">
+    {{ field_label(field.id, field.label.text) }}
+    <div class="input flex w-full items-center gap-2 bg-base-100/55">
+      {{ field(class="min-w-0 grow bg-transparent tabular-nums outline-none", type="text", required=true, inputmode="decimal", aria_invalid="true" if field.errors else "false", aria_describedby=error_id) }}
+      <span class="text-base-content/70">€</span>
+    </div>
+    {{ errors(field) }}
+  </div>
+{% endmacro %}

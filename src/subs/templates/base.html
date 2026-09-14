@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="">
+    <title>{% block title %}Subs{% endblock %}</title>
+    {% for stylesheet in frontend_assets.stylesheets %}
+      <link rel="stylesheet" href="{{ stylesheet }}">
+    {% endfor %}
+  </head>
+  <body class="min-h-dvh bg-base-200 text-base-content antialiased">
+    <div class="ambient-background" aria-hidden="true">
+      <div class="ambient-orb ambient-orb-primary"></div>
+      <div class="ambient-orb ambient-orb-secondary"></div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="toast toast-top toast-center z-100 w-full max-w-md px-4 pt-4" role="region" aria-label="Notifications">
+          {% for category, message in messages %}
+            <div
+              class="alert glass-toast {{ 'alert-success' if category == 'success' else 'alert-error' if category == 'error' else 'alert-info' }}"
+              role="{{ 'alert' if category == 'error' else 'status' }}"
+              data-flash-toast
+            >
+              {% if category == "success" %}
+                <svg class="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="m5 12 4 4L19 6"></path>
+                </svg>
+              {% elif category == "error" %}
+                <svg class="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9"></circle>
+                  <path d="m9 9 6 6m0-6-6 6"></path>
+                </svg>
+              {% endif %}
+              <span>{{ message }}</span>
+              <button class="btn btn-ghost btn-xs ml-auto" type="button" aria-label="Dismiss notification" data-dismiss-toast>
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="m6 6 12 12M18 6 6 18"></path>
+                </svg>
+              </button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block body %}{% endblock %}
+
+    {% for script in frontend_assets.scripts %}
+      <script type="module" src="{{ script }}"></script>
+    {% endfor %}
+  </body>
+</html>

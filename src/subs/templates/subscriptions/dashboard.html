@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% macro metric(label, value, icon_class) %}
+  <article class="glass-panel min-w-0 rounded-box p-4">
+    <div class="flex size-8 items-center justify-center rounded-box {{ icon_class }}">{{ caller() }}</div>
+    <p class="mt-4 text-xs font-semibold tracking-[0.08em] uppercase text-base-content/70">{{ label }}</p>
+    <strong class="mt-[0.2rem] block truncate text-xl font-bold tracking-[-0.035em] tabular-nums">{{ value }}</strong>
+  </article>
+{% endmacro %}
+
+{% macro date_value(value) %}
+  {{ value.strftime("%d %b %Y") if value else "Not set" }}
+{% endmacro %}
+
+{% macro event_date(row) %}
+  {% set active = row.subscription.active %}
+  {% set value = row.next_access_date if active else row.subscription.end_date %}
+  {% if value %}
+    {% set label = 'Next renewal' if active else 'Expiration' %}
+    <time datetime="{{ value.isoformat() }}" title="{{ label }}" aria-label="{{ label }}: {{ value.strftime('%d %b %Y') }}" class="inline-flex rounded-box px-2 py-1 text-xs font-semibold ring-1 ring-inset {{ 'bg-success/10 text-success-ink ring-success/20' if active else 'bg-error/10 text-error-ink ring-error/20' }}">{{ date_value(value) }}</time>
+  {% else %}
+    <span class="text-base-content/70">Not set</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro service_avatar(subscription, size="size-8") %}
+  <span class="service-avatar relative inline-flex flex-none items-center justify-center overflow-hidden rounded-box border border-base-content/10 bg-[color-mix(in_oklab,var(--color-base-300)_75%,var(--color-base-100))] text-xs font-semibold text-base-content/70 {{ size }}" aria-hidden="true">
+    <span>{{ subscription.service[0]|upper }}</span>
+    {% if subscription.image_url %}
+      <img
+        class="service-avatar-image absolute inset-0 size-full bg-base-100 object-cover"
+        src="{{ subscription.image_url }}"
+        alt=""
+        loading="lazy"
+        decoding="async"
+        referrerpolicy="no-referrer"
+        data-service-avatar-image
+      >
+    {% endif %}
+  </span>
+{% endmacro %}
+
+{% macro service_link(subscription) %}
+  <a href="{{ subscription.url }}" class="btn btn-ghost btn-sm btn-square rounded-box text-base-content/70 no-underline hover:bg-base-content/10 hover:text-base-content" target="_blank" rel="noopener noreferrer" title="Visit {{ subscription.service }}" aria-label="Visit {{ subscription.service }} (opens in a new tab)">
+    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M15 3h6v6m0-6L10 14"></path>
+      <path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"></path>
+    </svg>
+  </a>
+{% endmacro %}
+
+{% macro billing_schedule(subscription) %}
+  {% if subscription.billing_interval == 1 %}{{ {'day': 'Daily', 'week': 'Weekly', 'month': 'Monthly', 'year': 'Yearly'}[subscription.billing_period.value] }}{% else %}Every {{ subscription.billing_interval }} {{ subscription.billing_period.value }}s{% endif %}
+{% endmacro %}
+
+{% macro category_badge(category) %}
+  <span class="category-badge inline-flex items-center rounded-box border px-2 py-[0.18rem] text-xs font-bold leading-[1.2] whitespace-nowrap text-base-content" data-category="{{ category.value|lower }}">{{ category.value }}</span>
+{% endmacro %}
+
+{% macro sortable_heading(key, label, sorted=false, extra_class="") %}
+  <th{% if extra_class %} class="{{ extra_class }}"{% endif %} aria-sort="{{ 'ascending' if sorted else 'none' }}" data-sort-heading="{{ key }}">
+    <button class="sort-button inline-flex items-center gap-2 rounded-box cursor-pointer" type="button" data-sort-key="{{ key }}">
+      {{ label }}
+      <span class="sort-icon text-xs text-primary-ink" aria-hidden="true">{{ '↑' if sorted else '↕' }}</span>
+    </button>
+  </th>
+{% endmacro %}
+
+{% macro service_edit_button(subscription, avatar_size="size-8") %}
+  <button class="flex min-w-0 flex-1 items-center gap-2 rounded-box text-left" type="button" data-editor-trigger="{{ subscription.id }}" aria-label="Edit {{ subscription.service }}">
+    {{ service_avatar(subscription, avatar_size) }}
+    <span class="truncate font-semibold">{{ subscription.service }}</span>
+  </button>
+{% endmacro %}
+
+{% macro status_badge(subscription, dot=false) %}
+  <span class="badge badge-sm {{ 'badge-success' if subscription.active else 'badge-error' }} gap-2 whitespace-nowrap">
+    {% if dot %}<span class="size-1.5 rounded-box bg-current" aria-hidden="true"></span>{% endif %}
+    {{ "Active" if subscription.active else "Cancelled" }}
+  </span>
+{% endmacro %}
+
+{% block title %}Dashboard | Subs{% endblock %}
+
+{% block body %}
+  <div class="relative isolate min-h-dvh xl:flex xl:h-dvh xl:min-h-0 xl:flex-col">
+    <header class="shrink-0 sticky top-0 z-30 border-b border-base-content/10 bg-base-200/70 backdrop-blur-xl">
+      <div class="mx-auto flex max-w-[118rem] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <span class="text-base font-semibold tracking-tight">Subs</span>
+
+        <div class="relative flex items-center gap-2">
+          <button id="copy-calendar-link" type="button" data-calendar-feed-url="{{ calendar_feed_url }}" class="btn btn-ghost btn-sm toolbar-action" aria-label="Copy calendar link">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+              <path d="M16 3v4M8 3v4M3 11h18"></path>
+            </svg>
+            Calendar link
+          </button>
+          <p id="copy-feedback" class="absolute right-0 top-full mt-2 w-max max-w-[calc(100vw-2rem)] rounded-box bg-base-100 px-3 py-2 text-xs shadow-lg empty:hidden" role="status" aria-live="polite"></p>
+          <form method="post" action="{{ url_for('auth.logout') }}">
+            {{ logout_form.hidden_tag() }}
+            <button class="btn btn-ghost btn-sm toolbar-action toolbar-action-danger" type="submit">
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M10 17l5-5-5-5M15 12H3"></path>
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+              </svg>
+              Log out
+            </button>
+          </form>
+        </div>
+      </div>
+    </header>
+
+    <main class="mx-auto w-full max-w-[118rem] px-4 py-4 sm:px-6 lg:px-8 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:py-4">
+      <div class="mb-6 shrink-0 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <p class="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-primary-ink">Overview</p>
+          <h1 class="text-3xl font-semibold tracking-[-0.035em] sm:text-3xl">Subscription dashboard</h1>
+        </div>
+      </div>
+
+      <div class="grid min-h-0 items-start gap-6 xl:flex-1 xl:items-stretch xl:grid-cols-[minmax(0,2fr)_minmax(20rem,0.92fr)] 2xl:gap-6">
+        <section class="min-h-0 min-w-0 xl:flex" aria-labelledby="subscriptions-title" data-subscriptions-panel>
+          <div class="glass-panel w-full overflow-hidden rounded-box xl:flex xl:min-h-0 xl:flex-col">
+            <div class="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-4 border-b border-base-content/10 p-4 sm:p-6">
+              <div>
+                <h2 id="subscriptions-title" class="text-sm sm:text-lg font-semibold tracking-tight">Your subscriptions</h2>
+                <p class="mt-1 text-xs sm:text-sm text-base-content/70">{{ dashboard.rows|length }} total, {{ dashboard.active_count }} active</p>
+              </div>
+              {% if dashboard.rows %}
+                <div class="contents">
+                  <div class="join justify-self-end" role="group" aria-label="Filter subscriptions by status">
+                    <button class="btn btn-xs min-h-9 px-2 sm:btn-sm join-item btn-primary" type="button" data-status-filter="all" aria-pressed="true">All</button>
+                    <button class="btn btn-xs min-h-9 px-2 sm:btn-sm join-item btn-ghost" type="button" data-status-filter="active" aria-pressed="false">Active</button>
+                    <button class="btn btn-xs min-h-9 px-2 sm:btn-sm join-item btn-ghost" type="button" data-status-filter="cancelled" aria-pressed="false">Cancelled</button>
+                  </div>
+                <label class="col-span-2 block w-full lg:hidden">
+                  <span class="mb-2 block text-xs font-medium text-base-content/70">Sort subscriptions</span>
+                  <select class="select select-sm w-full bg-base-100/60" data-mobile-sort>
+                    <option value="service:asc">Service, A to Z</option>
+                    <option value="service:desc">Service, Z to A</option>
+                    <option value="next:asc" selected>Next event, soonest</option>
+                    <option value="charge:asc">Charge, lowest first</option>
+                    <option value="charge:desc">Charge, highest first</option>
+                    <option value="monthly:asc">Monthly avg., lowest first</option>
+                    <option value="monthly:desc">Monthly avg., highest first</option>
+                    <option value="yearly:asc">Yearly avg., lowest first</option>
+                    <option value="yearly:desc">Yearly avg., highest first</option>
+                    <option value="next:desc">Next event, latest</option>
+                  </select>
+                </label>
+                </div>
+              {% endif %}
+            </div>
+
+            {% if dashboard.rows %}
+              <div class="relative hidden overflow-hidden lg:block xl:min-h-0 xl:flex-1" data-table-overflow>
+                <div class="overflow-auto xl:h-full scrollbar-none [&::-webkit-scrollbar]:hidden" data-table-scroll tabindex="0" role="region" aria-label="Subscriptions table">
+                <table class="table table-sm min-w-280 [&_th]:text-center [&_td]:text-center [&_th:first-child]:text-left [&_td:first-child]:text-left" data-subscription-table>
+                  <thead class="sticky top-0 z-20 bg-base-100">
+                    <tr class="border-base-content/10 text-[0.68rem] uppercase tracking-[0.09em] text-base-content/70">
+                      {{ sortable_heading("service", "Service", extra_class="sticky left-0 z-10 min-w-44 bg-base-100/95 backdrop-blur-xl") }}
+                      <th>Status</th>
+                      <th>Category</th>
+                      <th>Start date</th>
+                      <th>Period</th>
+                      {{ sortable_heading("next", "Next event", sorted=true) }}
+                      <th>Payment method</th>
+                      {{ sortable_heading("charge", "Charge") }}
+                      {{ sortable_heading("monthly", "Monthly avg.") }}
+                      {{ sortable_heading("yearly", "Yearly avg.") }}
+                    </tr>
+                  </thead>
+                  <tbody data-sort-container>
+                    {% for row in dashboard.rows %}
+                      {% set subscription = row.subscription %}
+                      {% set next_event_date = row.next_access_date if subscription.active else subscription.end_date %}
+                      <tr
+                        class="subscription-row group cursor-pointer border-base-content/8 transition-colors hover:bg-primary/5 {{ 'text-base-content/70' if not subscription.active }}"
+                        data-subscription-id="{{ subscription.id }}"
+                        data-subscription-status="{{ 'active' if subscription.active else 'cancelled' }}"
+                        data-sort-service="{{ subscription.service|lower }}"
+                        data-sort-charge="{{ subscription.cost }}"
+                        data-sort-monthly="{{ row.monthly_cost|float }}"
+                        data-sort-yearly="{{ row.yearly_cost|float }}"
+                        data-sort-next="{{ next_event_date.isoformat() if next_event_date else '' }}"
+                      >
+                        <td class="sticky left-0 z-5 bg-base-100/95 bg-clip-padding py-2 font-semibold transition-colors group-hover:bg-[color-mix(in_oklab,var(--color-primary)_5%,var(--color-base-100))] backdrop-blur-xl">
+                          <div class="flex items-center gap-4">
+                            {{ service_edit_button(subscription) }}
+                            {% if subscription.url %}
+                              <span class="ml-auto shrink-0">{{ service_link(subscription) }}</span>
+                            {% endif %}
+                          </div>
+                        </td>
+                        <td>
+                          {{ status_badge(subscription, dot=true) }}
+                        </td>
+                        <td>{{ category_badge(subscription.category) }}</td>
+                        <td class="whitespace-nowrap">{{ date_value(subscription.start_date) }}</td>
+                        <td class="whitespace-nowrap">{{ billing_schedule(subscription) }}</td>
+                        <td class="whitespace-nowrap">{{ event_date(row) }}</td>
+                        <td class="whitespace-nowrap">{{ subscription.payment_method.value }}</td>
+                        <td class="font-medium tabular-nums">{{ subscription.cost|eur }}</td>
+                        <td class="font-medium tabular-nums">{{ row.monthly_cost|eur }}</td>
+                        <td class="font-medium tabular-nums">{{ row.yearly_cost|eur }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                </div>
+                <div class="pointer-events-none absolute inset-y-0 left-(--service-column-width) z-20 w-8 bg-linear-to-r from-base-100 to-transparent opacity-0 transition-opacity" data-table-fade="left" aria-hidden="true"></div>
+                <div class="pointer-events-none absolute inset-y-0 right-0 z-20 w-10 bg-linear-to-l from-base-100 to-transparent opacity-0 transition-opacity" data-table-fade="right" aria-hidden="true"></div>
+              </div>
+
+              <p class="hidden px-6 py-10 text-center text-sm text-base-content/70" data-filter-empty role="status"></p>
+              <div class="space-y-4 p-4 lg:hidden" data-card-container>
+                {% for row in dashboard.rows %}
+                  {% set subscription = row.subscription %}
+                  <article
+                    class="subscription-card cursor-pointer rounded-box border border-base-content/10 bg-base-100/45 p-4 shadow-sm transition-colors hover:border-primary/25 hover:bg-primary/5 {{ 'text-base-content/70' if not subscription.active }}"
+                    data-subscription-id="{{ subscription.id }}"
+                    data-subscription-status="{{ 'active' if subscription.active else 'cancelled' }}"
+                  >
+                    <div class="mb-4 flex items-center justify-between gap-4">
+                      {{ service_edit_button(subscription, "size-10") }}
+                      {% if subscription.url %}<span class="shrink-0">{{ service_link(subscription) }}</span>{% endif %}
+                    </div>
+                    <div class="mb-4 flex flex-wrap items-center gap-2">
+                      {{ status_badge(subscription) }}
+                      {{ category_badge(subscription.category) }}
+                      <span class="whitespace-nowrap text-sm font-semibold tabular-nums"><span class="sr-only">Charge: </span>{{ subscription.cost|eur }}</span>
+                    </div>
+                    <dl class="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
+                      <div><dt class="text-xs font-semibold tracking-wider uppercase text-base-content/70">Period</dt><dd class="mt-1 font-semibold leading-[1.35]">{{ billing_schedule(subscription) }}</dd></div>
+                      <div><dt class="text-xs font-semibold tracking-wider uppercase text-base-content/70">Next event</dt><dd class="mt-1 font-semibold leading-[1.35]">{{ event_date(row) }}</dd></div>
+                    </dl>
+                  </article>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="grid min-h-0 flex-1 place-items-center px-6 py-12 text-center">
+                <div class="max-w-sm">
+                  <div class="flex size-12 items-center justify-center rounded-box border border-primary/22 bg-primary/9 text-primary-ink mx-auto mb-4">
+                    <svg class="size-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path d="M6 7h12M6 12h12M6 17h7"></path>
+                      <rect x="3" y="3" width="18" height="18" rx="4"></rect>
+                    </svg>
+                  </div>
+                  <h3 class="text-lg font-semibold">A clean slate</h3>
+                  <p class="mt-2 text-sm leading-6 text-base-content/70">Add your first subscription to see renewals and normalized spending here.</p>
+                </div>
+              </div>
+            {% endif %}
+
+            <div class="shrink-0 border-t border-base-content/10 p-4 sm:p-6">
+              <button id="add-subscription" class="btn btn-primary w-full rounded-box sm:w-auto" type="button">
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+                Add subscription
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <aside class="grid min-h-0 min-w-0 gap-4 self-start md:grid-cols-2 xl:self-stretch xl:grid-cols-1 xl:grid-rows-[auto_minmax(0,1fr)]" aria-label="Subscription insights" data-subscription-insights>
+          <section class="grid min-w-0 gap-4 sm:grid-cols-3 md:col-span-2 xl:col-span-1 xl:grid-cols-3">
+            {% call metric("Active", dashboard.active_count, "bg-success/10 text-success-ink") %}
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m9 12 2 2 4-5"></path></svg>
+            {% endcall %}
+            {% call metric("Monthly", dashboard.monthly_spend|eur, "bg-primary/12 text-primary-ink") %}
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M6 3h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"></path><path d="M8 15h3"></path></svg>
+            {% endcall %}
+            {% call metric("Yearly", dashboard.yearly_spend|eur, "bg-secondary/12 text-secondary-ink") %}
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            {% endcall %}
+          </section>
+
+          <section class="glass-panel min-h-0 overflow-y-auto rounded-box p-4 sm:p-6 md:col-span-2 xl:col-span-1 xl:flex xl:flex-col" aria-labelledby="category-title">
+            <div class="mb-4 shrink-0 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p class="text-xs font-bold tracking-[0.17em] uppercase text-primary-ink">Spending mix</p>
+                <h2 id="category-title" class="mt-1 text-lg font-semibold tracking-[-0.02em]">By category</h2>
+              </div>
+              {% if dashboard.category_spending %}
+                <div class="join" role="group" aria-label="Spending period">
+                  <button class="btn btn-primary btn-sm join-item w-20" type="button" data-chart-period="monthly" aria-pressed="true">Monthly</button>
+                  <button class="btn btn-ghost btn-sm join-item w-20" type="button" data-chart-period="yearly" aria-pressed="false">Yearly</button>
+                </div>
+              {% endif %}
+            </div>
+            {% if dashboard.category_spending %}
+              <div class="relative mx-auto h-64 w-full max-w-[20rem] xl:h-auto xl:min-h-32 xl:flex-1">
+                <canvas id="category-chart" aria-label="Monthly spending by category" role="img"></canvas>
+              </div>
+              <ul class="mt-3 shrink-0 space-y-2" aria-label="Category spending values">
+                {% for spending in dashboard.category_spending %}
+                  <li class="flex items-center justify-between gap-4 text-sm">
+                    <span class="flex items-center gap-2"><span class="category-dot size-[0.55rem] flex-none rounded-box" data-category="{{ spending.category.value|lower }}"></span>{{ spending.category.value }}</span>
+                    <strong
+                      class="font-semibold tabular-nums"
+                      data-category-spending-value
+                      data-monthly-cost-label="{{ spending.monthly_cost|eur }}"
+                      data-yearly-cost-label="{{ spending.yearly_cost|eur }}"
+                    >{{ spending.monthly_cost|eur }}</strong>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="flex min-h-56 flex-col items-center justify-center px-4 py-6 text-center">
+                <div class="flex size-12 items-center justify-center rounded-box border border-primary/22 bg-primary/9 text-primary-ink">
+                  <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v9h9"></path><path d="M20.5 15a9 9 0 1 1-11-11"></path></svg>
+                </div>
+                <h3 class="mt-4 text-sm font-semibold">No active spending</h3>
+                <p class="mt-2 max-w-68 text-sm leading-[1.55] text-base-content/70">Active subscriptions with a cost will appear here.</p>
+              </div>
+            {% endif %}
+          </section>
+
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  {% include "subscriptions/editor.html" %}
+  {% include "subscriptions/delete_confirmation.html" %}
+  <script id="editor-defaults" type="application/json">{{ add_defaults|tojson }}</script>
+  <script id="subscription-data" type="application/json">{{ subscription_data|tojson }}</script>
+  <script id="category-chart-data" type="application/json">{{ chart_data|tojson }}</script>
+{% endblock %}

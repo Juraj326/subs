@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Please reload | Subs{% endblock %}
+
+{% block body %}
+  <main class="relative isolate grid min-h-dvh place-items-center px-4 py-10">
+    <section class="glass-panel w-full max-w-sm rounded-box p-4 text-center sm:p-6" aria-labelledby="csrf-title">
+      <p class="mb-2 text-sm font-semibold tracking-[0.16em] text-primary-ink">Subs</p>
+      <h1 id="csrf-title" class="text-3xl font-semibold tracking-tight">Please reload the page</h1>
+      <p class="mt-4 text-sm leading-6 text-base-content/70">Your form has expired or could not be verified. No changes were saved.</p>
+      <p class="mt-4 text-sm leading-6 text-base-content/70">Go back, reload the page, and try again.</p>
+    </section>
+  </main>
+{% endblock %}

@@ -1,0 +1,20 @@
+<dialog
+  id="delete-confirmation"
+  class="modal"
+  aria-labelledby="delete-confirmation-title"
+  aria-describedby="delete-confirmation-description"
+>
+  <div class="modal-box glass-panel max-w-md rounded-box p-4 sm:p-6">
+    <div class="mb-4 flex size-11 items-center justify-center rounded-box bg-error/12 text-error-ink">
+      <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m-9 0 1 15h8l1-15M10 10v7M14 10v7"></path></svg>
+    </div>
+    <h2 id="delete-confirmation-title" class="text-xl font-semibold tracking-tight">Delete <span id="delete-service-name">this subscription</span>?</h2>
+    <p id="delete-confirmation-description" class="mt-2 text-sm leading-6 text-base-content/70">The subscription will be permanently removed from the dashboard and calendar feed.</p>
+    <form id="delete-subscription-form" method="post" action="" class="mt-6 flex flex-col-reverse gap-4 sm:flex-row sm:justify-end">
+      {{ delete_form.hidden_tag() }}
+      <button class="btn btn-ghost rounded-box" type="button" data-cancel-delete>Keep subscription</button>
+      <button class="btn btn-error rounded-box" type="submit" disabled>Delete permanently</button>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Cancel deletion">cancel</button></form>
+</dialog>

@@ -1,0 +1,82 @@
+{% from "components/forms.html" import currency_field, field_label, form_field %}
+
+<dialog
+  id="subscription-editor"
+  class="modal editor-modal"
+  aria-labelledby="editor-title"
+  aria-describedby="editor-description"
+  data-editor-mode="{{ editor_mode or '' }}"
+  data-editor-subscription-id="{{ editor_subscription.id if editor_subscription else '' }}"
+  data-auto-open="{{ 'true' if editor_mode else 'false' }}"
+  {% if editor_mode %}open{% endif %}
+>
+  <div class="modal-box glass-panel relative flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl flex-col overflow-hidden rounded-box p-0 sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100%-3rem)]">
+    <div class="flex items-start justify-between gap-4 border-b border-base-content/10 px-4 py-4 sm:px-6 sm:py-6">
+      <div>
+        <p id="editor-kicker" class="text-xs font-bold tracking-[0.17em] uppercase text-primary-ink">{{ "Edit subscription" if editor_mode == "edit" else "New subscription" }}</p>
+        <h2 id="editor-title" class="mt-1 text-xl font-semibold tracking-tight">{{ editor_subscription.service if editor_subscription else "Add subscription" }}</h2>
+        <p id="editor-description" class="mt-2 text-sm text-base-content/70">Keep the charge date anchored to the original payment.</p>
+      </div>
+      <button class="btn btn-ghost btn-square btn-sm shrink-0" type="button" aria-label="Close editor" data-close-editor>
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg>
+      </button>
+    </div>
+
+    <div class="overflow-y-auto overscroll-contain">
+      <form id="subscription-form" method="post" action="{{ url_for('subscriptions.update_subscription_route', subscription_id=editor_subscription.id) if editor_subscription else url_for('subscriptions.add_subscription') }}" data-add-url="{{ url_for('subscriptions.add_subscription') }}" novalidate>
+        <div class="space-y-4 p-4 sm:p-6">
+          {{ form.hidden_tag() }}
+          <div id="subscription-form-errors" class="alert alert-error text-sm {{ 'hidden' if not form.form_errors }}" role="alert" data-form-errors>
+            <svg class="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16h.01"></path></svg>
+            <ul class="space-y-1">{% for error in form.form_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+          </div>
+
+          {{ form_field(form.service, maxlength=32, required=true, autocomplete="organization") }}
+          <div class="grid gap-4 sm:grid-cols-2">
+            {{ form_field(form.category, control="select", required=true) }}
+            {{ form_field(status_form.active, control="select", wrapper_id="status-field", hidden=editor_mode != "edit", disabled=editor_mode != "edit") }}
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            {{ form_field(form.start_date, help_text="Use DD.MM.YYYY. This date stays as the recurrence anchor.", type="text", placeholder="DD.MM.YYYY", required=true) }}
+            <div class="min-w-0">
+              {{ field_label("end-date-display", "End date") }}
+              <input id="end-date-display" class="input w-full bg-base-200/60 text-base-content/70" value="{{ editor_subscription.end_date.strftime('%d.%m.%Y') if editor_subscription and editor_subscription.end_date else '' }}" placeholder="Calculated when cancelled" disabled>
+              <p class="mt-2 text-xs leading-[1.45] text-base-content/70">Calculated when the subscription is cancelled.</p>
+            </div>
+          </div>
+          <fieldset>
+            <legend class="mb-4 text-sm font-semibold text-base-content/70">Billing schedule</legend>
+            <div class="grid gap-4 sm:grid-cols-3">
+              {{ form_field(form.billing_period, control="select", help_text="Period", label_hidden=true, required=true, aria_label=form.billing_period.label.text) }}
+              {{ form_field(form.billing_interval, help_text="Interval", label_hidden=true, min=1, max=32767, required=true, inputmode="numeric", aria_label=form.billing_interval.label.text) }}
+              {{ form_field(form.billing_date_offset, help_text="Access offset in days (+ later, − earlier)", label_hidden=true, min=-32768, max=32767, required=true, inputmode="numeric", aria_label=form.billing_date_offset.label.text) }}
+            </div>
+          </fieldset>
+          <div class="grid gap-4 sm:grid-cols-2">
+            {{ form_field(form.payment_method, control="select", required=true) }}
+            {{ currency_field(form.cost) }}
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            {{ form_field(form.url, help_text="Optional account or service page.", placeholder="https://", inputmode="url", autocomplete="url") }}
+            {{ form_field(form.image_url, help_text="Optional logo or artwork shown beside the service name.", placeholder="https://", inputmode="url", autocomplete="url") }}
+          </div>
+        </div>
+        <div class="flex flex-col-reverse gap-4 border-t border-base-content/10 bg-base-100/35 px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
+          <button class="btn btn-ghost rounded-box" type="button" data-close-editor>Cancel</button>
+          <button id="save-subscription" class="btn btn-primary rounded-box px-6" type="submit">{{ "Save changes" if editor_mode == "edit" else "Add subscription" }}</button>
+        </div>
+      </form>
+
+      <section id="destructive-section" class="border-t border-error/15 bg-error/5 px-4 py-4 sm:px-6 {{ 'hidden' if editor_mode != 'edit' }}" aria-labelledby="destructive-title">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 id="destructive-title" class="text-sm font-semibold text-error-ink">Delete subscription</h3>
+            <p class="mt-1 text-xs leading-5 text-base-content/70">This permanently removes the record and cannot be undone.</p>
+          </div>
+          <button id="request-delete" class="btn btn-error btn-outline btn-sm shrink-0 rounded-box" type="button">Delete subscription</button>
+        </div>
+      </section>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Close editor">close</button></form>
+</dialog>

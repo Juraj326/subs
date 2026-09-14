@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "components/forms.html" import form_field %}
+
+{% block title %}Log in | Subs{% endblock %}
+
+{% block body %}
+  <main class="relative isolate grid min-h-dvh place-items-center px-4 py-10">
+    <section class="glass-panel w-full max-w-sm rounded-box p-4 sm:p-6" aria-labelledby="login-title" aria-describedby="login-description">
+      <div class="mb-6 flex flex-col items-center text-center">
+        <p class="mb-2 text-sm font-semibold tracking-[0.16em] text-primary-ink">Subs</p>
+        <h1 id="login-title" class="text-3xl font-semibold tracking-tight">Welcome back</h1>
+        <p id="login-description" class="mt-2 text-sm leading-6 text-base-content/70">Enter passphrase to unlock.</p>
+      </div>
+
+      <form method="post" class="space-y-4" novalidate>
+        {{ form.hidden_tag() }}
+        {{ form_field(form.passphrase, extra_class="h-12", autocomplete="current-password", autofocus=true, required=true) }}
+        {{ form.submit(class="btn btn-primary h-12 w-full rounded-box text-base shadow-lg shadow-primary/20") }}
+      </form>
+    </section>
+  </main>
+{% endblock %}
