@@ -1,7 +1,6 @@
 import os
 import re
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -20,13 +19,11 @@ from subs.formatting import format_eur
 from .extensions import csrf, db, limiter, migrate
 from .models import Subscription as Subscription
 
-_PUBLIC_DIR = Path(__file__).resolve().parents[2] / "public"
-
 
 def create_app(test_config: Mapping[str, Any] | None = None) -> Flask:
     app = Flask(
         import_name=__name__,
-        static_folder=str(_PUBLIC_DIR),
+        static_folder="static",
         static_url_path="",
     )
     app.config.from_mapping(_load_config(test_config))

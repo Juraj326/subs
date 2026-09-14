@@ -5,14 +5,14 @@ export default defineConfig({
   plugins: [tailwindcss()],
   publicDir: false,
   build: {
-    outDir: "public",
-    emptyOutDir: false,
+    outDir: "src/subs/static/assets",
+    emptyOutDir: true,
     rollupOptions: {
       input: "assets/js/main.js",
       output: {
-        entryFileNames: "assets/main.js",
-        chunkFileNames: "assets/[name].js",
-        assetFileNames: "assets/[name][extname]",
+        entryFileNames: "main.js",
+        chunkFileNames: "[name].js",
+        assetFileNames: "[name][extname]",
       },
     },
   },
