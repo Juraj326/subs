@@ -23,8 +23,7 @@ from .models import Subscription as Subscription
 def create_app(test_config: Mapping[str, Any] | None = None) -> Flask:
     app = Flask(
         import_name=__name__,
-        static_folder="static",
-        static_url_path="",
+        static_folder=None,
     )
     app.config.from_mapping(_load_config(test_config))
 
@@ -49,7 +48,7 @@ def create_app(test_config: Mapping[str, Any] | None = None) -> Flask:
 
     @app.before_request
     def auth_required() -> Response | None:
-        public_endpoints = {"auth.login", "auth.logout", "calendar.ical", "static"}
+        public_endpoints = {"auth.login", "auth.logout", "calendar.ical"}
         if not request.endpoint:
             return
         if request.endpoint in public_endpoints or session.get("authenticated"):
