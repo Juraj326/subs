@@ -31,4 +31,4 @@ dev = [
 ]
 
 [tool.vercel.scripts]
-build = "npm ci && npm run build"
+build = "npm ci && npm run build && cp public/manifest.json src/subs/vite-manifest.json"
