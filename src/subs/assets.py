@@ -1,7 +1,4 @@
-import json
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
 
 from flask import Flask, url_for
 
@@ -30,13 +27,7 @@ def get_frontend_assets(app: Flask) -> FrontendAssets:
     if environment == "test":
         return FrontendAssets(scripts=(), stylesheets=())
 
-    manifest_path = Path(app.static_folder or "") / "manifest.json"
-    try:
-        manifest: dict[str, Any] = json.loads(manifest_path.read_text())
-        entry = manifest[_ENTRYPOINT]
-        script = url_for("static", filename=entry["file"])
-        stylesheets = tuple(url_for("static", filename=path) for path in entry.get("css", ()))
-    except (FileNotFoundError, KeyError, TypeError, json.JSONDecodeError) as error:
-        raise RuntimeError("Vite production assets are missing or invalid") from error
-
-    return FrontendAssets(scripts=(script,), stylesheets=stylesheets)
+    return FrontendAssets(
+        scripts=(url_for("static", filename="assets/main.js"),),
+        stylesheets=(url_for("static", filename="assets/main.css"),),
+    )
