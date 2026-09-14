@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from flask import Flask, url_for
+from flask import Flask
 
 _ENTRYPOINT = "assets/js/main.js"
 _STYLESHEET = "assets/app.css"
@@ -28,6 +28,6 @@ def get_frontend_assets(app: Flask) -> FrontendAssets:
         return FrontendAssets(scripts=(), stylesheets=())
 
     return FrontendAssets(
-        scripts=(url_for("static", filename="assets/main.js"),),
-        stylesheets=(url_for("static", filename="assets/main.css"),),
+        scripts=("/assets/main.js",),
+        stylesheets=("/assets/main.css",),
     )
