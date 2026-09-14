@@ -7,9 +7,13 @@ export default defineConfig({
   build: {
     outDir: "public",
     emptyOutDir: false,
-    manifest: "manifest.json",
     rollupOptions: {
       input: "assets/js/main.js",
+      output: {
+        entryFileNames: "assets/main.js",
+        chunkFileNames: "assets/[name].js",
+        assetFileNames: "assets/[name][extname]",
+      },
     },
   },
 });
