@@ -30,7 +30,7 @@ def get_frontend_assets(app: Flask) -> FrontendAssets:
     if environment == "test":
         return FrontendAssets(scripts=(), stylesheets=())
 
-    manifest_path = Path(__file__).with_name("vite-manifest.json")
+    manifest_path = Path(app.static_folder or "") / "manifest.json"
     try:
         manifest: dict[str, Any] = json.loads(manifest_path.read_text())
         entry = manifest[_ENTRYPOINT]
