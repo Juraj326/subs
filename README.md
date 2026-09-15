@@ -1,7 +1,5 @@
 # Subs
 
-# Subs
-
 A personal, single-user web app I built to track my subscriptions and recurring expenses.
 
 Subs provides a simple dashboard for tracking active and cancelled subscriptions, monitoring monthly and yearly spending, visualizing expenses by category, and keeping track of upcoming payments through an iCalendar feed.
