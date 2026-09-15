@@ -73,6 +73,9 @@ def _load_config(overrides: Mapping[str, Any] | None = None) -> dict[str, Any]:
         "SESSION_COOKIE_HTTPONLY": True,
         "SESSION_COOKIE_SAMESITE": "Lax",
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
+        "SQLALCHEMY_ENGINE_OPTIONS": {
+            "pool_pre_ping": True,
+        },
     }
 
     if overrides:
