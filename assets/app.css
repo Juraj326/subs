@@ -189,6 +189,10 @@
     background: var(--glass-raised-surface);
   }
 
+  .select::picker(select) {
+    @apply bg-base-100 text-base-content;
+  }
+
   :is(.input, .select):is(:focus, :focus-within, :open) {
     @apply border-primary outline-none ring-2 ring-primary/30 shadow-[0_0_12px] shadow-primary/25;
   }

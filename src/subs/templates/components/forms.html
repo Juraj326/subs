@@ -9,7 +9,7 @@
 {% endmacro %}
 
 {% macro form_field(field, control="input", extra_class="", help_text=none, label_hidden=false, wrapper_id=none, hidden=false) %}
-  {% set control_class = 'select w-full bg-base-100/55' if control == 'select' else 'input w-full bg-base-100/55' %}
+  {% set control_class = 'select w-full bg-base-100' if control == 'select' else 'input w-full bg-base-100/55' %}
   {% set error_id = field.id ~ '-errors' %}
   {% set help_id = field.id ~ '-help' if help_text else none %}
   {% set describedby = help_id ~ ' ' ~ error_id if help_id else error_id %}
@@ -28,7 +28,7 @@
   <div class="min-w-0">
     {{ field_label(field.id, field.label.text) }}
     <div class="input flex w-full items-center gap-2 bg-base-100/55">
-      {{ field(class="min-w-0 grow bg-transparent tabular-nums outline-none", type="text", required=true, inputmode="decimal", aria_invalid="true" if field.errors else "false", aria_describedby=error_id) }}
+      {{ field(class="min-w-0 grow bg-transparent tabular-nums outline-none", type="text", required=true, inputmode="decimal", aria_invalid="true" if field.errors else "false", aria_describedby=error_id, **kwargs) }}
       <span class="text-base-content/70">€</span>
     </div>
     {{ errors(field) }}

@@ -43,6 +43,26 @@ def _editor_payload(response: TestResponse) -> dict[str, Any]:
     return json.loads(match[1])
 
 
+def _assert_details_locked(response: TestResponse, *, locked: bool) -> None:
+    controls = {
+        match[2]: match[0]
+        for match in re.finditer(r'<(input|select)\b[^>]*\bid="([^"]+)"[^>]*>', response.get_data(as_text=True))
+    }
+    for name in (
+        "category",
+        "start_date",
+        "billing_period",
+        "billing_interval",
+        "billing_date_offset",
+        "payment_method",
+        "cost",
+    ):
+        assert (" disabled" in controls[name]) is locked
+    for name in ("service", "url", "image_url", "active"):
+        assert " disabled" not in controls[name]
+    assert " disabled" in controls["end-date-display"]
+
+
 def test_create_saves_normalized_values(authenticated_client: FlaskClient, repository: Repository) -> None:
     response = authenticated_client.post(
         "/subscriptions/add",
@@ -159,6 +179,7 @@ def test_invalid_edit_preserves_entered_and_saved_values(
     assert b'value="sNaN"' in response.data
     assert b'value="Unsaved"' in response.data
     assert b'value="https://unsaved.example.com"' in response.data
+    _assert_details_locked(response, locked=False)
     payload = _editor_payload(response)["1"]
     assert payload["values"] == _form_data(active="false")
     assert payload["endDate"] == "02.03.2026"
@@ -225,56 +246,103 @@ def test_reactivate_clears_expiration(authenticated_client: FlaskClient, reposit
     repository.commit.assert_called_once_with()
 
 
-def test_legacy_expiration_is_repaired_once_on_valid_save(
-    authenticated_client: FlaskClient, repository: Repository
+@pytest.mark.parametrize("forged", [False, True], ids=["omitted", "forged"])
+def test_cancelled_edit_preserves_protected_values(
+    authenticated_client: FlaskClient, repository: Repository, forged: bool
 ) -> None:
     saved = make_subscription(
         start_date=date(2026, 1, 15), billing_date_offset=-5, active=False, end_date=date(2026, 9, 15)
     )
     repository.rows.append(saved)
-    data = _form_data(start_date="15.01.2026", billing_date_offset="-5", active="false", cost="17.45")
-    committed: list[tuple[date | None, Decimal]] = []
-    repository.commit.side_effect = lambda: committed.append((saved.end_date, saved.cost))
+    original = _editor_payload(authenticated_client.get("/subscriptions/1"))["1"]
+    data = {"service": "Renamed", "url": "https://changed.example.com", "image_url": "", "active": "false"}
+    if forged:
+        data = (
+            _form_data(
+                start_date="invalid",
+                category="invalid",
+                billing_period="invalid",
+                billing_interval="0",
+                billing_date_offset="invalid",
+                payment_method="invalid",
+                cost="sNaN",
+                end_date="01.01.1900",
+            )
+            | data
+        )
 
-    assert _editor_payload(authenticated_client.get("/subscriptions/1"))["1"]["endDate"] == "15.09.2026"
-    assert authenticated_client.post("/subscriptions/1/update", data=data | {"cost": "sNaN"}).status_code == 422
-    assert saved.end_date == date(2026, 9, 15)
-    assert saved.cost == Decimal("12.90")
-    repository.commit.assert_not_called()
+    response = authenticated_client.post("/subscriptions/1/update", data=data)
 
-    assert authenticated_client.post("/subscriptions/1/update", data=data).status_code == 302
-    assert committed == [(date(2026, 9, 10), Decimal("17.45"))]
-    assert authenticated_client.post("/subscriptions/1/update", data=data | {"cost": "18.90"}).status_code == 302
-    assert committed == [(date(2026, 9, 10), Decimal("17.45")), (date(2026, 9, 10), Decimal("18.90"))]
-    assert _editor_payload(authenticated_client.get("/subscriptions/1"))["1"]["endDate"] == "10.09.2026"
+    assert response.status_code == 302
+    updated = _editor_payload(authenticated_client.get("/subscriptions/1"))["1"]
+    assert updated == original | {
+        "values": original["values"] | {"service": data["service"], "url": data["url"], "image_url": ""}
+    }
+    repository.commit.assert_called_once_with()
 
 
-def test_invalid_recorded_cycle_rejects_edit_before_mutating(
+def test_invalid_cancelled_edit_preserves_errors_and_locked_saved_details(
     authenticated_client: FlaskClient, repository: Repository
 ) -> None:
-    offset = -5
-    expiration = date(2026, 9, 14)
-    saved = make_subscription(
-        start_date=date(2026, 1, 15), billing_date_offset=offset, active=False, end_date=expiration
-    )
+    saved = make_subscription(active=False, end_date=date(2026, 3, 2))
     repository.rows.append(saved)
     before = dict(vars(saved))
 
     response = authenticated_client.post(
-        "/subscriptions/1/update", data=_form_data(service="Changed", active="false", cost="20.00")
+        "/subscriptions/1/update",
+        data={"service": "Unsaved", "active": "false", "url": "ftp://invalid.example.com", "image_url": ""},
     )
 
     assert response.status_code == 422
-    assert b"Recorded expiration does not match the billing schedule." in response.data
+    assert b'value="Unsaved"' in response.data
+    assert b'value="ftp://invalid.example.com"' in response.data
+    assert b"URL must use HTTP or HTTPS." in response.data
+    assert b'value="12.90"' in response.data
+    assert b'value="02.03.2026"' in response.data
+    _assert_details_locked(response, locked=True)
     assert vars(saved) == before
     repository.commit.assert_not_called()
+
+
+def test_invalid_cancellation_retains_pending_details(
+    authenticated_client: FlaskClient, repository: Repository
+) -> None:
+    saved = make_subscription()
+    repository.rows.append(saved)
+    before = dict(vars(saved))
+
+    response = authenticated_client.post(
+        "/subscriptions/1/update",
+        data=_form_data(active="false", start_date="15.01.2026", billing_interval="3", cost="sNaN"),
+    )
+
+    assert response.status_code == 422
+    assert b'value="15.01.2026"' in response.data
+    assert b'value="3"' in response.data
+    assert b'value="sNaN"' in response.data
+    assert b"Cost must be a valid decimal amount." in response.data
+    _assert_details_locked(response, locked=True)
+    assert vars(saved) == before
+    repository.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("active", [True, False])
+def test_direct_editor_link_locks_only_cancelled_details(
+    authenticated_client: FlaskClient, repository: Repository, active: bool
+) -> None:
+    repository.rows.append(make_subscription(active=active, end_date=None if active else date(2026, 3, 2)))
+
+    response = authenticated_client.get("/subscriptions/1")
+
+    assert response.status_code == 200
+    _assert_details_locked(response, locked=not active)
 
 
 def test_delete_is_post_only_and_removes_record(authenticated_client: FlaskClient, repository: Repository) -> None:
     saved = make_subscription()
     repository.rows.append(saved)
 
-    assert authenticated_client.get("/subscriptions/1/remove").status_code == 404
+    assert authenticated_client.get("/subscriptions/1/remove").status_code == 405
     assert authenticated_client.delete("/subscriptions/1/remove").status_code == 405
     assert repository.rows == [saved]
     response = authenticated_client.post("/subscriptions/1/remove", follow_redirects=True)

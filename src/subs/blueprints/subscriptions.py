@@ -1,11 +1,11 @@
 from typing import Any, cast
 
-from flask import Blueprint, current_app, flash, redirect, render_template, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from werkzeug import Response
 
 from subs.formatting import format_eur
 from subs.forms.action import ActionForm
-from subs.forms.editor import EditorSubscriptionPayload, editor_values
+from subs.forms.editor import CANCELLED_PROTECTED_FIELDS, EditorSubscriptionPayload, editor_values
 from subs.forms.subscription import SubscriptionForm, UpdateSubscriptionForm
 from subs.models.subscription import Subscription
 from subs.repositories import subscription as subscription_repository
@@ -68,7 +68,12 @@ def update_subscription_route(subscription_id: int) -> Response | tuple[str, int
         flash("That subscription could not be found.", "error")
         return redirect(url_for("subscriptions.index"))
 
-    form = UpdateSubscriptionForm()
+    formdata = request.form.copy()
+    if not subscription.active and formdata.get("active") == "false":
+        saved_values = editor_values(subscription)
+        for name in CANCELLED_PROTECTED_FIELDS:
+            formdata[name] = saved_values[name]
+    form = UpdateSubscriptionForm(formdata=formdata)
     if form.validate_on_submit():
         try:
             updated = update_subscription(

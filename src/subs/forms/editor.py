@@ -8,6 +8,16 @@ from subs.models.enums.category import Category
 from subs.models.enums.payment_method import PaymentMethod
 from subs.models.subscription import Subscription
 
+CANCELLED_PROTECTED_FIELDS = (
+    "category",
+    "start_date",
+    "billing_period",
+    "billing_interval",
+    "billing_date_offset",
+    "payment_method",
+    "cost",
+)
+
 
 class EditorValues(TypedDict):
     service: str

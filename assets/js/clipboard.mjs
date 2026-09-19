@@ -45,7 +45,7 @@ export const initializeClipboard = () => {
       feedback.classList.toggle("text-error", !copied);
       feedback.classList.toggle("text-success", copied);
       window.clearTimeout(feedbackTimeout);
-      feedbackTimeout = window.setTimeout(() => { feedback.textContent = ""; }, 4000);
+      feedbackTimeout = window.setTimeout(() => { feedback.textContent = ""; }, 2500);
     }
   });
 };

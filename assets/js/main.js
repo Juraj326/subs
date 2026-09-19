@@ -19,10 +19,13 @@ if (document.querySelector("[data-subscriptions-panel]")) {
   initializeClipboard();
 }
 
-document.querySelectorAll("[data-dismiss-toast]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const toast = button.closest("[data-flash-toast]");
+document.querySelectorAll("[data-flash-toast]").forEach((toast) => {
+  const dismiss = () => {
+    window.clearTimeout(timeout);
+    if (toast.classList.contains("is-leaving")) return;
     toast.classList.add("is-leaving");
     window.setTimeout(() => toast.remove(), 180);
-  });
+  };
+  const timeout = window.setTimeout(dismiss, 2500);
+  toast.querySelector("[data-dismiss-toast]").addEventListener("click", dismiss);
 });

@@ -1,4 +1,5 @@
 {% from "components/forms.html" import currency_field, field_label, form_field %}
+{% set details_locked = editor_mode == "edit" and status_form.active.data is sameas false %}
 
 <dialog
   id="subscription-editor"
@@ -33,28 +34,29 @@
 
           {{ form_field(form.service, maxlength=32, required=true, autocomplete="organization") }}
           <div class="grid gap-4 sm:grid-cols-2">
-            {{ form_field(form.category, control="select", required=true) }}
+            {{ form_field(form.category, control="select", required=true, disabled=details_locked, data_cancelled_protected=true) }}
             {{ form_field(status_form.active, control="select", wrapper_id="status-field", hidden=editor_mode != "edit", disabled=editor_mode != "edit") }}
           </div>
+          <p id="cancelled-details-help" class="text-sm text-base-content/70 {{ 'hidden' if not details_locked }}">Select Active to edit the category, billing details, payment method, or cost.</p>
           <div class="grid gap-4 sm:grid-cols-2">
-            {{ form_field(form.start_date, help_text="Use DD.MM.YYYY. This date stays as the recurrence anchor.", type="text", placeholder="DD.MM.YYYY", required=true) }}
+            {{ form_field(form.start_date, help_text="Use DD.MM.YYYY. This date stays as the recurrence anchor.", type="text", placeholder="DD.MM.YYYY", required=true, disabled=details_locked, data_cancelled_protected=true) }}
             <div class="min-w-0">
               {{ field_label("end-date-display", "End date") }}
-              <input id="end-date-display" class="input w-full bg-base-200/60 text-base-content/70" value="{{ editor_subscription.end_date.strftime('%d.%m.%Y') if editor_subscription and editor_subscription.end_date else '' }}" placeholder="Calculated when cancelled" disabled>
+              <input id="end-date-display" class="input w-full bg-base-200/60 text-base-content/70" value="{{ editor_subscription.end_date.strftime('%d.%m.%Y') if details_locked and editor_subscription.end_date else '' }}" placeholder="Calculated when cancelled" disabled>
               <p class="mt-2 text-xs leading-[1.45] text-base-content/70">Calculated when the subscription is cancelled.</p>
             </div>
           </div>
           <fieldset>
             <legend class="mb-4 text-sm font-semibold text-base-content/70">Billing schedule</legend>
             <div class="grid gap-4 sm:grid-cols-3">
-              {{ form_field(form.billing_period, control="select", help_text="Period", label_hidden=true, required=true, aria_label=form.billing_period.label.text) }}
-              {{ form_field(form.billing_interval, help_text="Interval", label_hidden=true, min=1, max=32767, required=true, inputmode="numeric", aria_label=form.billing_interval.label.text) }}
-              {{ form_field(form.billing_date_offset, help_text="Access offset in days (+ later, − earlier)", label_hidden=true, min=-32768, max=32767, required=true, inputmode="numeric", aria_label=form.billing_date_offset.label.text) }}
+              {{ form_field(form.billing_period, control="select", help_text="Period", label_hidden=true, required=true, aria_label=form.billing_period.label.text, disabled=details_locked, data_cancelled_protected=true) }}
+              {{ form_field(form.billing_interval, help_text="Interval", label_hidden=true, min=1, max=32767, required=true, inputmode="numeric", aria_label=form.billing_interval.label.text, disabled=details_locked, data_cancelled_protected=true) }}
+              {{ form_field(form.billing_date_offset, help_text="Access offset in days (+ later, − earlier)", label_hidden=true, min=-32768, max=32767, required=true, inputmode="numeric", aria_label=form.billing_date_offset.label.text, disabled=details_locked, data_cancelled_protected=true) }}
             </div>
           </fieldset>
           <div class="grid gap-4 sm:grid-cols-2">
-            {{ form_field(form.payment_method, control="select", required=true) }}
-            {{ currency_field(form.cost) }}
+            {{ form_field(form.payment_method, control="select", required=true, disabled=details_locked, data_cancelled_protected=true) }}
+            {{ currency_field(form.cost, disabled=details_locked, data_cancelled_protected=true) }}
           </div>
           <div class="grid gap-4 sm:grid-cols-2">
             {{ form_field(form.url, help_text="Optional account or service page.", placeholder="https://", inputmode="url", autocomplete="url") }}

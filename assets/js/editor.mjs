@@ -21,6 +21,8 @@ export const initializeEditor = ({ subscriptionData, addDefaults }) => {
   const saveButton = document.getElementById("save-subscription");
   const statusField = document.getElementById("status-field");
   const statusInput = form.elements.namedItem("active");
+  const protectedFields = form.querySelectorAll("[data-cancelled-protected]");
+  const cancelledHelp = document.getElementById("cancelled-details-help");
   const endDate = document.getElementById("end-date-display");
   const destructiveSection = document.getElementById("destructive-section");
   const deleteButton = document.getElementById("request-delete");
@@ -49,9 +51,16 @@ export const initializeEditor = ({ subscriptionData, addDefaults }) => {
 
   const focusEditor = () => {
     window.setTimeout(() => {
-      const target = form.querySelector('[aria-invalid="true"]') || form.elements.namedItem("service");
+      const target = form.querySelector('[aria-invalid="true"]:not(:disabled)') || form.elements.namedItem("service");
       if (target instanceof HTMLElement) target.focus();
     }, 0);
+  };
+
+  const syncStatus = () => {
+    const locked = state.mode === "edit" && statusInput.value === "false";
+    protectedFields.forEach((field) => { field.disabled = locked; });
+    cancelledHelp.classList.toggle("hidden", !locked);
+    endDate.value = locked ? state.subscription?.endDate || "" : "";
   };
 
   const stateFromLocation = () => {
@@ -82,7 +91,7 @@ export const initializeEditor = ({ subscriptionData, addDefaults }) => {
     saveButton.textContent = subscription ? "Save changes" : "Add subscription";
     statusField.classList.toggle("hidden", !subscription);
     statusInput.disabled = !subscription;
-    endDate.value = subscription?.endDate || "";
+    syncStatus();
     destructiveSection.classList.toggle("hidden", !subscription);
     if (!editor.open) editor.showModal();
     focusEditor();
@@ -139,6 +148,24 @@ export const initializeEditor = ({ subscriptionData, addDefaults }) => {
   });
   window.addEventListener("popstate", () => {
     render(stateFromLocation());
+  });
+
+  statusInput.addEventListener("change", () => {
+    if (statusInput.value === "false" && state.subscription?.values.active === "false") {
+      protectedFields.forEach((field) => {
+        field.value = state.subscription.values[field.name];
+        field.setAttribute("aria-invalid", "false");
+        const errors = document.getElementById(`${field.id}-errors`);
+        errors.replaceChildren();
+        errors.classList.add("hidden");
+      });
+    }
+    syncStatus();
+  });
+
+  form.addEventListener("formdata", (event) => {
+    if (statusInput.value !== "false" || state.subscription?.values.active !== "true") return;
+    protectedFields.forEach((field) => { event.formData.set(field.name, field.value); });
   });
 
   deleteButton.addEventListener("click", () => {

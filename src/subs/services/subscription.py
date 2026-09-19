@@ -93,68 +93,28 @@ def update_subscription(
     subscription = _get_subscription(subscription_id)
     _ensure_service_is_unique(service, subscription_id)
 
-    end_date = subscription.end_date
-    if not active:
-        if subscription.active:
+    if subscription.active or active:
+        end_date = None
+        if not active:
             _, end_date = get_billing_and_expiration_date(
                 start_date, billing_period, billing_interval, billing_date_offset, as_of
             )
-        else:
-            end_date = correct_cancelled_expiration(
-                subscription, start_date, billing_period, billing_interval, billing_date_offset
-            )
-    elif not subscription.active:
-        end_date = None
+        subscription.active = active
+        subscription.start_date = start_date
+        subscription.end_date = end_date
+        subscription.category = category
+        subscription.billing_period = billing_period
+        subscription.billing_interval = billing_interval
+        subscription.billing_date_offset = billing_date_offset
+        subscription.payment_method = payment_method
+        subscription.cost = cost
 
-    subscription.active = active
     subscription.service = service
-    subscription.start_date = start_date
-    subscription.end_date = end_date
-    subscription.category = category
-    subscription.billing_period = billing_period
-    subscription.billing_interval = billing_interval
-    subscription.billing_date_offset = billing_date_offset
-    subscription.payment_method = payment_method
-    subscription.cost = cost
     subscription.url = url
     subscription.image_url = image_url
 
     _commit()
     return subscription
-
-
-def correct_cancelled_expiration(
-    subscription: Subscription,
-    start_date: date,
-    billing_period: BillingPeriod,
-    billing_interval: int,
-    offset: int,
-) -> date:
-    index = _recorded_cancellation_index(subscription)
-    reference = _renewal_at(start_date, subscription.billing_period, subscription.billing_interval, index)
-    corrected_index = _first_renewal_index(start_date, billing_period, billing_interval, reference)
-    return _renewal_at(start_date, billing_period, billing_interval, corrected_index) + timedelta(days=offset)
-
-
-def _recorded_cancellation_index(subscription: Subscription) -> int:
-    if subscription.end_date is None:
-        raise SubscriptionValidationError({"start_date": "Cancelled subscription has no recorded expiration."})
-
-    boundaries = [subscription.end_date - timedelta(days=subscription.billing_date_offset)]
-    if subscription.billing_date_offset < 0:
-        boundaries.append(subscription.end_date)
-
-    for boundary in boundaries:
-        index = _first_renewal_index(
-            subscription.start_date, subscription.billing_period, subscription.billing_interval, boundary
-        )
-        if (
-            _renewal_at(subscription.start_date, subscription.billing_period, subscription.billing_interval, index)
-            == boundary
-        ):
-            return index
-
-    raise SubscriptionValidationError({"start_date": "Recorded expiration does not match the billing schedule."})
 
 
 def delete_subscription(subscription_id: int) -> Subscription:

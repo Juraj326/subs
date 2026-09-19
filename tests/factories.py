@@ -1,19 +1,11 @@
 from datetime import date
 from decimal import Decimal
-from typing import TypedDict
 
 from subs.forms.subscription import SubscriptionInput
 from subs.models.enums.billing_period import BillingPeriod
 from subs.models.enums.category import Category
 from subs.models.enums.payment_method import PaymentMethod
 from subs.models.subscription import Subscription
-
-
-class ScheduleChanges(TypedDict, total=False):
-    start_date: date
-    billing_period: BillingPeriod
-    billing_interval: int
-    billing_date_offset: int
 
 
 def subscription_input() -> SubscriptionInput:
