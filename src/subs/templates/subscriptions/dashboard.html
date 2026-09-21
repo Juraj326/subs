@@ -142,10 +142,10 @@
                     <option value="next:asc" selected>Next event, soonest</option>
                     <option value="charge:asc">Charge, lowest first</option>
                     <option value="charge:desc">Charge, highest first</option>
-                    <option value="monthly:asc">Monthly avg., lowest first</option>
-                    <option value="monthly:desc">Monthly avg., highest first</option>
-                    <option value="yearly:asc">Yearly avg., lowest first</option>
-                    <option value="yearly:desc">Yearly avg., highest first</option>
+                    <option value="monthly:asc">Monthly, lowest first</option>
+                    <option value="monthly:desc">Monthly, highest first</option>
+                    <option value="yearly:asc">Yearly, lowest first</option>
+                    <option value="yearly:desc">Yearly, highest first</option>
                     <option value="next:desc">Next event, latest</option>
                   </select>
                 </label>
@@ -167,8 +167,8 @@
                       {{ sortable_heading("next", "Next event", sorted=true) }}
                       <th>Payment method</th>
                       {{ sortable_heading("charge", "Charge") }}
-                      {{ sortable_heading("monthly", "Monthly avg.") }}
-                      {{ sortable_heading("yearly", "Yearly avg.") }}
+                      {{ sortable_heading("monthly", "Monthly") }}
+                      {{ sortable_heading("yearly", "Yearly") }}
                     </tr>
                   </thead>
                   <tbody data-sort-container>
